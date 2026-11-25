@@ -14,7 +14,7 @@ from blixtbo import landlords
 from blixtbo.config import settings
 from blixtbo.db import init_db, session
 from blixtbo.jobs import accept_approval, session_cookie_from_body
-from blixtbo.billing import client_secret_from_subscription, entitlement_from_event, firebase_uid_from_event, price_lookup_key, price_ore
+from blixtbo.billing import client_secret_from_subscription, entitlement_from_event, firebase_uid_from_event, is_stripe_test_key, price_lookup_key, price_ore
 from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
 from blixtbo.models import AuditLog, Job, LandlordLogin, Notice, User
@@ -152,7 +152,7 @@ def _write_entitlement(uid: str, entitlement: dict) -> None:
 def _stripe():
     import stripe
 
-    if not settings.stripe_secret_key.startswith("sk_test_"):
+    if not is_stripe_test_key(settings.stripe_secret_key):
         raise HTTPException(status_code=503, detail="Stripe-testnyckel saknas.")
     stripe.api_key = settings.stripe_secret_key
     return stripe

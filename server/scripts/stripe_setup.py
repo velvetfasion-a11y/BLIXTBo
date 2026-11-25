@@ -8,14 +8,14 @@ import sys
 
 import stripe
 
-from blixtbo.billing import price_lookup_key, price_ore
+from blixtbo.billing import is_stripe_test_key, price_lookup_key, price_ore
 from blixtbo.config import settings
 
 
 def main() -> int:
     key = settings.stripe_secret_key or os.environ.get("STRIPE_SECRET_KEY", "")
-    if not key.startswith("sk_test_"):
-        print("Sätt STRIPE_SECRET_KEY till en testnyckel (sk_test_...). Inga live-nycklar.", file=sys.stderr)
+    if not is_stripe_test_key(key):
+        print("Sätt STRIPE_SECRET_KEY till en testnyckel (sk_test_ eller rk_test_). Inga live-nycklar.", file=sys.stderr)
         return 1
     stripe.api_key = key
     key_name = price_lookup_key()

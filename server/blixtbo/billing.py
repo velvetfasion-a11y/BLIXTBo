@@ -11,7 +11,13 @@ def price_ore() -> int:
 
 
 def price_lookup_key() -> str:
-    return f"blixtbo_premium_monthly_{int(settings.premium_price_kr)}_sek"
+    """Existing Stripe Price. STRIPE_PRICE_ID wins when it is set."""
+    return "blixtbo_premium_monthly"
+
+
+def is_stripe_test_key(key: str) -> bool:
+    """Secret or restricted test keys. Live keys (sk_live_, rk_live_) are refused."""
+    return key.startswith(("sk_test_", "rk_test_"))
 
 
 def subscription_data(firebase_uid: str) -> dict:

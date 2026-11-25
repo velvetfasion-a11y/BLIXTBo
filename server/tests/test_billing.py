@@ -1,4 +1,4 @@
-from blixtbo.billing import can_auto_apply, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, price_lookup_key, price_ore, subscription_data
+from blixtbo.billing import can_auto_apply, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, is_stripe_test_key, price_lookup_key, price_ore, subscription_data
 from blixtbo.config import settings
 
 
@@ -6,7 +6,12 @@ def test_price_is_99_sek_and_trial_is_three_days():
     settings.premium_price_kr = 99
     settings.trial_days = 3
     assert price_ore() == 9900
-    assert price_lookup_key() == "blixtbo_premium_monthly_99_sek"
+    assert price_lookup_key() == "blixtbo_premium_monthly"
+    assert is_stripe_test_key("sk_test_abc")
+    assert is_stripe_test_key("rk_test_abc")
+    assert not is_stripe_test_key("sk_live_abc")
+    assert not is_stripe_test_key("rk_live_abc")
+    assert not is_stripe_test_key("")
     data = subscription_data("uid-1")
     assert data["trial_period_days"] == 3
     assert data["metadata"]["firebaseUid"] == "uid-1"

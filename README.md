@@ -31,8 +31,8 @@ Så pratar de: webbläsaren skriver användarens egna dokument med Firebase-klie
 Premium kostar **99 kr/mån** efter **3 dagars** gratis provperiod. Beloppet och längden styrs av `PREMIUM_PRICE_KR` och `TRIAL_DAYS`. Provperioden sätts med `trial_period_days` på prenumerationen. Det finns ingen 149-kronorsnivå och ingen rabattkod.
 
 1. Skapa ett konto på [Stripe](https://dashboard.stripe.com/register) och stanna i **testläge** (reglaget Test mode). Använd aldrig en live-nyckel.
-2. **Developers → API keys**. Kopiera den hemliga testnyckeln (`sk_test_...`) till `STRIPE_SECRET_KEY` i `server/.env`, och den publika (`pk_test_...`) till `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` i `.env.local`.
-3. Priset skapas av API:t första gången någon startar en prenumeration, med lookup key `blixtbo_premium_monthly_99_sek`. Du kan också köra `cd server && python3 scripts/stripe_setup.py`. Bara `sk_test_` accepteras.
+2. **Developers → API keys**. Kopiera en testnyckel (`sk_test_...` eller en begränsad `rk_test_...`) till `STRIPE_SECRET_KEY` i `server/.env`, och den publika (`pk_test_...`) till `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` i `.env.local`. `sk_live_` och `rk_live_` avvisas.
+3. Sätt `STRIPE_PRICE_ID` till det befintliga priset. Om det saknas slår API:t upp lookup key `blixtbo_premium_monthly` (99 kr/mån) och skapar priset om det inte finns. `python3 scripts/stripe_setup.py` gör samma uppslag.
 4. **Developers → Webhooks → Add endpoint**. Adress: `https://blixtbo.se/api/billing/webhook`. Händelser: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Kopiera `whsec_...` till `STRIPE_WEBHOOK_SECRET`.
 
 Kortet, Apple Pay och Google Pay visas i appens eget ark. Ingen omdirigering till Stripe Checkout. Provperioden är `trial_period_days`. Webhooken skriver `users/{uid}/billing/entitlement`. Paus och avslut är knappar i appen.
