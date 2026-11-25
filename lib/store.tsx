@@ -2,8 +2,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, useState } from "react";
 import { createDemo, createFreshUser, createLoggedOut, queueForSource, segmentMatches, welcomeNotice } from "@/lib/data";
+import { activeForSource, applicationLimit, atApplicationLimit, isActiveApplication } from "@/lib/limits";
 import { completeness, queueAlert } from "@/lib/profile";
-import type { Connection, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, User } from "@/lib/types";
+import type { AppStatus, Connection, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, Source, User } from "@/lib/types";
 
 const KEY = "blixtbo-v1";
 const SERVER_STATE = createLoggedOut(0);
@@ -30,8 +31,9 @@ function getSnapshot(): Persisted {
   try {
     const parsed = JSON.parse(raw) as Persisted;
     if (parsed.version !== 1 || !Array.isArray(parsed.listings)) throw new Error("bad");
-    cache = { raw, value: parsed };
-    return parsed;
+    const value = { ...parsed, waiting: parsed.waiting ?? [] };
+    cache = { raw, value };
+    return value;
   } catch {
     cache = { raw: "", value: EMPTY_STATE };
     return EMPTY_STATE;
@@ -44,6 +46,25 @@ function getServerSnapshot() {
 
 function latest() {
   return cache?.value && cache.value !== SERVER_STATE ? cache.value : getSnapshot();
+}
+
+function slotNotice(current: Persisted, sourceId: string): Notice | null {
+  const source = current.sources.find((item) => item.id === sourceId);
+  if (!source || applicationLimit(source) == null) return null;
+  if (atApplicationLimit(current.sources, current.applications, current.listings, sourceId)) return null;
+  const waiting = current.waiting.find((item) => item.sourceId === sourceId);
+  if (!waiting) return null;
+  const listing = current.listings.find((item) => item.id === waiting.listingId);
+  if (!listing) return null;
+  return {
+    id: `n-slot-${sourceId}-${Date.now()}`,
+    kind: "system",
+    title: `En plats har öppnats hos ${source.name}`,
+    body: `${listing.address} ligger i Väntar på plats. Du kan söka den nu.`,
+    at: new Date().toISOString(),
+    read: false,
+    href: `/bostad?id=${listing.id}`,
+  };
 }
 
 function commit(next: Persisted) {
@@ -79,7 +100,10 @@ type Store = Persisted & {
   setCityAreas: (areas: string[], on: boolean) => void;
   clearFilters: () => void;
   skip: (listingId: string) => void;
-  apply: (listingId: string, options?: { quiet?: boolean }) => { status: "applied"; position: number } | { status: "connected-needed" | "exists" | "missing" };
+  apply: (listingId: string, options?: { quiet?: boolean }) => { status: "applied"; position: number } | { status: "connected-needed" | "exists" | "missing" | "limit" };
+  deferListing: (listingId: string) => void;
+  swapApplication: (applicationId: string, listingId: string) => void;
+  setSourceLimit: (id: string, patch: Partial<Pick<Source, "applicationLimit" | "plusLimit" | "plusPriceKr" | "plusUrl">>) => void;
   updateAccount: (patch: { name?: string; email?: string; phone?: string; monthlyIncome?: number | null }) => void;
   connect: (sourceId: string, email: string, options?: { quiet?: boolean; bankIdSession?: boolean }) => void;
   disconnect: (sourceId: string) => void;
@@ -254,9 +278,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!current) return { status: "missing" as const };
     const listing = current.listings.find((item) => item.id === listingId);
     if (!listing) return { status: "missing" as const };
-    if (current.applications.some((item) => item.listingId === listingId)) return { status: "exists" as const };
+    if (current.applications.some((item) => item.listingId === listingId && isActiveApplication(item.status))) return { status: "exists" as const };
     const connection = current.connections[listing.sourceId];
     if (!connection || connection.status !== "connected") return { status: "connected-needed" as const };
+    if (atApplicationLimit(current.sources, current.applications, current.listings, listing.sourceId)) return { status: "limit" as const };
     const published = new Date(listing.publishedAt).getTime();
     const minutesAfter = Math.max(0, Math.round((Date.now() - published) / 60000));
     const position = minutesAfter < 15 ? 1 : minutesAfter < 60 ? 2 : minutesAfter < 180 ? 5 : 9;
@@ -289,6 +314,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         },
         ...current.applications,
       ],
+      waiting: current.waiting.filter((item) => item.listingId !== listingId),
       notifications: notice ? [notice, ...current.notifications] : current.notifications,
     });
     setUndo({ kind: "apply", listingId, applicationId: id });
@@ -300,6 +326,81 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       );
     }
     return { status: "applied" as const, position };
+  }, []);
+
+  const deferListing = useCallback((listingId: string) => {
+    const current = latest();
+    if (!current) return;
+    const listing = current.listings.find((item) => item.id === listingId);
+    if (!listing) return;
+    if (current.waiting.some((item) => item.listingId === listingId)) {
+      setToast(`${listing.address} ligger redan i Väntar på plats`);
+      return;
+    }
+    commit({
+      ...current,
+      waiting: [...current.waiting, { listingId, sourceId: listing.sourceId, savedAt: new Date().toISOString() }],
+    });
+    setToast(`${listing.address} sparad i Väntar på plats`);
+    setUndo(null);
+  }, []);
+
+  const swapApplication = useCallback((applicationId: string, listingId: string) => {
+    const current = latest();
+    if (!current) return;
+    const withdrawn = current.applications.find((item) => item.id === applicationId);
+    const listing = current.listings.find((item) => item.id === listingId);
+    if (!withdrawn || !listing || !isActiveApplication(withdrawn.status)) return;
+    if (current.applications.some((item) => item.listingId === listingId && isActiveApplication(item.status))) return;
+    const connection = current.connections[listing.sourceId];
+    if (!connection || connection.status !== "connected") return;
+    const published = new Date(listing.publishedAt).getTime();
+    const minutesAfter = Math.max(0, Math.round((Date.now() - published) / 60000));
+    const position = minutesAfter < 15 ? 1 : minutesAfter < 60 ? 2 : minutesAfter < 180 ? 5 : 9;
+    const id = `app-${Date.now()}`;
+    const previous = current.listings.find((item) => item.id === withdrawn.listingId);
+    const notice: Notice = {
+      id,
+      kind: "status",
+      title: "Ansökan ersatt",
+      body: `${listing.address} skickades. ${previous?.address ?? "Den förra"} är tillbakadragen.`,
+      at: new Date().toISOString(),
+      read: false,
+      href: "/koll",
+    };
+    commit({
+      ...current,
+      applications: [
+        {
+          id,
+          listingId,
+          status: "skickad",
+          appliedAt: new Date().toISOString(),
+          eventAt: new Date().toISOString(),
+          position,
+          minutesAfterPublish: minutesAfter,
+          note: previous ? `Ersatte ansökan till ${previous.address}.` : "Ersatte en tidigare ansökan.",
+        },
+        ...current.applications.map((item) =>
+          item.id === applicationId
+            ? { ...item, status: "aterkallad" as const, eventAt: new Date().toISOString(), note: `Tillbakadragen för att söka ${listing.address}.` }
+            : item,
+        ),
+      ],
+      waiting: current.waiting.filter((item) => item.listingId !== listingId),
+      notifications: [notice, ...current.notifications],
+    });
+    setToast(`${listing.address} ersatte ${previous?.address ?? "en ansökan"}`);
+    setUndo(null);
+  }, []);
+
+  const setSourceLimit = useCallback((id: string, patch: Partial<Pick<Source, "applicationLimit" | "plusLimit" | "plusPriceKr" | "plusUrl">>) => {
+    const current = latest();
+    if (!current) return;
+    commit({
+      ...current,
+      sources: current.sources.map((source) => (source.id === id ? { ...source, ...patch } : source)),
+    });
   }, []);
 
   const connect = useCallback((sourceId: string, email: string, options?: { quiet?: boolean; bankIdSession?: boolean }) => {
@@ -406,7 +507,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!application || application.status !== "erbjuden") return;
     const listing = current.listings.find((item) => item.id === application.listingId);
     const address = listing?.address ?? "bostaden";
-    const status = accept ? "accepterad" : "avbojd";
+    const status: AppStatus = accept ? "accepterad" : "avbojd";
     const note = accept
       ? "Du tackade ja. Nästa steg är att skriva under kontraktet och betala depositionen."
       : application.affectsQueue
@@ -421,12 +522,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       read: false,
       href: `/erbjudande?id=${applicationId}`,
     };
+    const applications = current.applications.map((item) =>
+      item.id === applicationId ? { ...item, status, note, eventAt: new Date().toISOString() } : item,
+    );
+    const freed = isActiveApplication(application.status) && !isActiveApplication(status)
+      ? slotNotice({ ...current, applications }, listing?.sourceId ?? "")
+      : null;
     commit({
       ...current,
-      applications: current.applications.map((item) =>
-        item.id === applicationId ? { ...item, status, note, eventAt: new Date().toISOString() } : item,
-      ),
-      notifications: [notice, ...current.notifications],
+      applications,
+      notifications: freed ? [freed, notice, ...current.notifications] : [notice, ...current.notifications],
     });
     setToast(accept ? `Du tackade ja till ${address}` : `Erbjudandet på ${address} är avböjt`);
   }, []);
@@ -447,14 +552,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       read: false,
       href: "/koll",
     };
+    const applications = current.applications.map((item) =>
+      item.id === applicationId
+        ? { ...item, status: "kontrakt" as const, note: "Kontraktet är signerat. Inflytt enligt datumet i erbjudandet.", eventAt: new Date().toISOString() }
+        : item,
+    );
+    const freed = slotNotice({ ...current, applications }, listing?.sourceId ?? "");
     commit({
       ...current,
-      applications: current.applications.map((item) =>
-        item.id === applicationId
-          ? { ...item, status: "kontrakt", note: "Kontraktet är signerat. Inflytt enligt datumet i erbjudandet.", eventAt: new Date().toISOString() }
-          : item,
-      ),
-      notifications: [notice, ...current.notifications],
+      applications,
+      notifications: freed ? [freed, notice, ...current.notifications] : [notice, ...current.notifications],
     });
     setToast(`Kontrakt signerat · ${address}`);
   }, []);
@@ -510,10 +617,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (action.kind === "skip") {
       commit({ ...current, dismissed: current.dismissed.filter((id) => id !== action.listingId) });
     } else {
+      const removed = current.applications.find((item) => item.id === action.applicationId);
+      const applications = current.applications.filter((item) => item.id !== action.applicationId);
+      const sourceId = current.listings.find((item) => item.id === removed?.listingId)?.sourceId ?? "";
+      const freed = removed && isActiveApplication(removed.status) ? slotNotice({ ...current, applications }, sourceId) : null;
       commit({
         ...current,
-        applications: current.applications.filter((item) => item.id !== action.applicationId),
-        notifications: current.notifications.filter((item) => item.id !== action.applicationId),
+        applications,
+        notifications: [
+          ...(freed ? [freed] : []),
+          ...current.notifications.filter((item) => item.id !== action.applicationId),
+        ],
       });
     }
     setUndo(null);
@@ -544,6 +658,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       clearFilters,
       skip,
       apply,
+      deferListing,
+      swapApplication,
+      setSourceLimit,
       connect,
       disconnect,
       markRead,
@@ -574,6 +691,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     clearFilters,
     skip,
     apply,
+    deferListing,
+    swapApplication,
+    setSourceLimit,
     connect,
     disconnect,
     markRead,

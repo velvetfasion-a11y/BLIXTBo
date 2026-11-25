@@ -7,6 +7,7 @@ import { Boot } from "@/components/boot";
 import { Countdown } from "@/components/countdown";
 import { EmptyState, Segmented, StatusPill, Switch, cx } from "@/components/ui";
 import { formatDate, formatDateTime, formatNumber, kr, monthYear, relative, rokShort } from "@/lib/format";
+import { activeForSource, applicationLimit, limitCounter } from "@/lib/limits";
 import { queueAlert, queuePlace } from "@/lib/profile";
 import { useStore } from "@/lib/store";
 import type { AppStatus, Queue } from "@/lib/types";
@@ -19,6 +20,7 @@ const STATUS: Record<AppStatus, { label: string; tone: "info" | "gold" | "pine" 
   avbojd: { label: "Avböjd", tone: "danger" },
   kontrakt: { label: "Kontrakt", tone: "pine" },
   nekad: { label: "Nekad", tone: "danger" },
+  aterkallad: { label: "Tillbakadragen", tone: "danger" },
 };
 
 const OFFER_STATUS = new Set<AppStatus>(["erbjuden", "accepterad", "avbojd", "kontrakt"]);
@@ -62,6 +64,7 @@ function TrackerInner() {
       <p className="mt-2 max-w-lg text-sm leading-relaxed text-soft">
         Allt du har sökt, och varje kö du står i. Varningarna kommer innan kötiden kan nollställas.
       </p>
+      <ApplicationCounters />
       {warnings.length > 0 ? (
         <div className="mt-5 space-y-2">
           {warnings.map(({ queue, place, alert }) => (
@@ -101,7 +104,9 @@ function TrackerInner() {
               action={<Link href="/hem" className="rounded-full bg-ink px-4 py-2 text-sm text-paper">Till flödet</Link>}
             />
           ) : (
-            store.applications.map((application) => {
+            <>
+              <WaitingList />
+              {store.applications.map((application) => {
               const listing = store.listings.find((item) => item.id === application.listingId);
               const status = STATUS[application.status];
               const expanded = open === application.id;
@@ -158,7 +163,8 @@ function TrackerInner() {
                   ) : null}
                 </article>
               );
-            })
+            })}
+            </>
           )
         ) : store.queues.length === 0 ? (
           <EmptyState
@@ -208,6 +214,52 @@ function TrackerInner() {
         )}
       </div>
     </div>
+  );
+}
+
+function ApplicationCounters() {
+  const store = useStore();
+  const rows = store.sources.flatMap((source) => {
+    if (applicationLimit(source) == null) return [];
+    const connected = store.connections[source.id]?.status === "connected";
+    const count = activeForSource(store.applications, store.listings, source.id).length;
+    if (!connected && count === 0) return [];
+    return [{ id: source.id, label: limitCounter(source, count) }];
+  });
+  if (rows.length === 0) return null;
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      {rows.map((row) => (
+        <p key={row.id} className="rounded-full bg-paper-deep px-3 py-1 text-sm text-ink">
+          {row.label}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function WaitingList() {
+  const store = useStore();
+  if (store.waiting.length === 0) return null;
+  return (
+    <section className="rounded-3xl border border-line bg-card p-4">
+      <h2 className="text-sm font-medium">Väntar på plats</h2>
+      <ul className="mt-3 space-y-3">
+        {store.waiting.map((spot) => {
+          const listing = store.listings.find((item) => item.id === spot.listingId);
+          const source = store.sources.find((item) => item.id === spot.sourceId);
+          if (!listing) return null;
+          return (
+            <li key={spot.listingId} className="text-sm">
+              <Link href={`/bostad?id=${listing.id}`} className="font-medium">{listing.address}</Link>
+              <p className="mt-0.5 text-soft">
+                {source?.name}. Vi säger till när en ansökan avslutas och en plats öppnas.
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

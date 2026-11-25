@@ -93,6 +93,10 @@ export type Source = {
   health: SourceHealth;
   enabled: boolean;
   requiresBankId: boolean;
+  applicationLimit?: number | null;
+  plusLimit?: number | null;
+  plusPriceKr?: number | null;
+  plusUrl?: string;
 };
 
 export type Connection = {
@@ -103,7 +107,13 @@ export type Connection = {
   bankIdSession?: boolean;
 };
 
-export type AppStatus = "skickad" | "visning" | "erbjuden" | "accepterad" | "avbojd" | "kontrakt" | "nekad";
+export type AppStatus = "skickad" | "visning" | "erbjuden" | "accepterad" | "avbojd" | "kontrakt" | "nekad" | "aterkallad";
+
+export type WaitingSpot = {
+  listingId: string;
+  sourceId: string;
+  savedAt: string;
+};
 
 export type Application = {
   id: string;
@@ -187,6 +197,7 @@ export type Persisted = {
   filters: Filters;
   connections: Record<string, Connection>;
   applications: Application[];
+  waiting: WaitingSpot[];
   queues: Queue[];
   notifications: Notice[];
   dismissed: string[];

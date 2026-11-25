@@ -25,6 +25,10 @@ class Landlord:
     pass_sel: str
     submit_sel: str
     requires_bankid: bool
+    application_limit: int | None = None
+    plus_limit: int | None = None
+    plus_price_kr: int | None = None
+    plus_url: str = ""
 
 
 @dataclass
@@ -52,6 +56,10 @@ LANDLORDS: dict[str, Landlord] = {
         pass_sel="input[type=password]",
         submit_sel="button[type=submit]",
         requires_bankid=False,
+        application_limit=5,
+        plus_limit=10,
+        plus_price_kr=349,
+        plus_url="https://www.homeq.se/plus",
     ),
     "wahlin": Landlord(
         id="wahlin",
