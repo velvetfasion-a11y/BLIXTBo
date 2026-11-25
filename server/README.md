@@ -2,6 +2,10 @@
 
 API plus one Playwright worker. No paid model. Landlord passwords are encrypted with a per-user key. Only the worker has the key that unwraps them. The API and the admin screens never receive it.
 
+App data lives in Firestore (`DATA_BACKEND=firestore`). Postgres remains the worker job queue. The worker writes ciphertext to `credentials/{firebaseUid}/landlords/{sourceId}` with the Admin SDK. Set `FIREBASE_AUTH_EMULATOR_HOST` and `FIRESTORE_EMULATOR_HOST` when you point that SDK at the emulators. `LANDLORD_MODE` stays `dry-run` until a real landlord page has been checked.
+
+End users sign in with Firebase Auth in the browser. `POST /auth/firebase` with `Authorization: Bearer <ID token>` links that user to the API. `/internal/ops` still requires that token, `OWNER_GOOGLE_EMAIL`, and the TOTP cookie. The old Google OAuth redirect is unused for new sign-ins.
+
 Nothing in this folder buys or starts a server. The steps below are what you run yourself.
 
 ## What runs where

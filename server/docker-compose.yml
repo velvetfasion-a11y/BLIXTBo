@@ -15,6 +15,10 @@ services:
   worker:
     build: .
     env_file: .env
+    environment:
+      # Admin SDK. FIREBASE_SERVICE_ACCOUNT and DATA_BACKEND come from env_file.
+      # Set FIRESTORE_EMULATOR_HOST=host.docker.internal:8088 to use the emulator.
+      LANDLORD_MODE: dry-run
     command: ["python", "-m", "blixtbo.scheduler"]
     depends_on:
       db:

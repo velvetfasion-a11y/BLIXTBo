@@ -30,7 +30,53 @@ def get_db():
         db.close()
 
 
+def _bearer(request: Request) -> str | None:
+    header = request.headers.get("authorization") or ""
+    if header.lower().startswith("bearer "):
+        token = header.split(" ", 1)[1].strip()
+        return token or None
+    return None
+
+
+def user_from_firebase(request: Request, db: Session) -> User | None:
+    """Map a Firebase ID token to the local user row. Swipes themselves live in Firestore."""
+    if settings.data_backend != "firestore" and not settings.firebase_project_id:
+        return None
+    token = _bearer(request)
+    if not token:
+        body_token = None
+    else:
+        body_token = token
+    if not body_token:
+        return None
+    try:
+        from blixtbo.firebase_app import verify_id_token
+
+        decoded = verify_id_token(body_token)
+    except Exception:
+        return None
+    uid = str(decoded.get("uid") or "")
+    email = str(decoded.get("email") or "").lower()
+    if not uid or not email:
+        return None
+    user = db.query(User).filter_by(firebase_uid=uid).one_or_none()
+    if user is None:
+        user = db.query(User).filter_by(email=email).one_or_none()
+    if user is None:
+        user = User(email=email, name=str(decoded.get("name") or ""), google_sub=str(decoded.get("sub") or uid), auth_method="google", firebase_uid=uid)
+        db.add(user)
+    else:
+        user.firebase_uid = uid
+        if decoded.get("name") and not user.name:
+            user.name = str(decoded.get("name"))
+    db.commit()
+    return user
+
+
 def current_user(request: Request, db: Session = Depends(get_db)) -> User | None:
+    firebase_user = user_from_firebase(request, db)
+    if firebase_user is not None:
+        return firebase_user
     raw = request.cookies.get("blixtbo")
     if not raw:
         return None
@@ -47,8 +93,10 @@ def require_user(user: User | None = Depends(current_user)) -> User:
     return user
 
 
-def require_owner(request: Request, user: User | None = Depends(current_user)) -> User:
-    if user is None or user.email.lower() != settings.owner_google_email.lower() or not request.cookies.get("blixtbo_totp"):
+def require_owner(request: Request, db: Session = Depends(get_db)) -> User:
+    user = user_from_firebase(request, db) if settings.data_backend == "firestore" else current_user(request, db)
+    owner = (settings.owner_google_email or "").lower()
+    if user is None or not owner or user.email.lower() != owner or not request.cookies.get("blixtbo_totp"):
         raise HTTPException(status_code=404)
     return user
 
@@ -61,11 +109,38 @@ def audit(db: Session, email: str, action: str, target: str = "") -> None:
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    if settings.data_backend != "firestore":
+        return
+    try:
+        from blixtbo.firebase_app import firestore_client
+
+        firestore_client().collection("config").document("landlords").collection("sources").document("homeq").set(
+            {
+                "applicationLimit": 5,
+                "plusLimit": 10,
+                "plusPriceKr": 349,
+                "plusUrl": "https://www.homeq.se/plus",
+            },
+            merge=True,
+        )
+    except Exception as exc:
+        print(f"blixtbo firestore seed skipped: {exc}", flush=True)
 
 
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
+
+
+@app.post("/auth/firebase")
+def firebase_session(request: Request, db: Session = Depends(get_db)) -> JSONResponse:
+    """End-user Google sign-in is Firebase Auth. The bearer token links that user to the API."""
+    user = user_from_firebase(request, db)
+    if user is None or not user.firebase_uid:
+        raise HTTPException(status_code=401, detail="Ogiltig Firebase-inloggning.")
+    response = JSONResponse({"ok": True, "uid": user.firebase_uid})
+    response.set_cookie("blixtbo", serializer.dumps({"uid": user.id}), httponly=True, secure=True, samesite="lax", max_age=60 * 60 * 24 * 14)
+    return response
 
 
 @app.get("/auth/google/start")
@@ -207,10 +282,37 @@ def _totp_ok(user: User, code: str) -> bool:
     return pyotp.TOTP(user.totp_secret).verify(code, valid_window=1)
 
 
+def _owner_candidate(request: Request, db: Session) -> User | None:
+    user = user_from_firebase(request, db) if settings.data_backend == "firestore" else current_user(request, db)
+    owner = (settings.owner_google_email or "").lower()
+    if user is None or not owner or user.email.lower() != owner:
+        return None
+    return user
+
+
+@app.put(settings.admin_path + "/landlords/{source_id}")
+def admin_limit(source_id: str, body: dict, owner: User = Depends(require_owner), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.credentials import refuse_bankid_document
+    from blixtbo.firebase_app import firestore_client
+
+    if settings.data_backend != "firestore":
+        raise HTTPException(status_code=409, detail="DATA_BACKEND är inte firestore.")
+    document = {
+        "applicationLimit": body.get("applicationLimit"),
+        "plusLimit": body.get("plusLimit"),
+        "plusPriceKr": body.get("plusPriceKr"),
+        "plusUrl": str(body.get("plusUrl") or ""),
+    }
+    refuse_bankid_document(document)
+    firestore_client().collection("config").document("landlords").collection("sources").document(source_id).set(document, merge=True)
+    audit(db, owner.email, "admin.limits", source_id)
+    return {"ok": True, "source_id": source_id}
+
+
 @app.get(settings.admin_path)
 def admin_home(request: Request, db: Session = Depends(get_db)) -> dict:
-    user = current_user(request, db)
-    if user is None or user.email.lower() != settings.owner_google_email.lower():
+    user = _owner_candidate(request, db)
+    if user is None:
         raise HTTPException(status_code=404)
     if not request.cookies.get("blixtbo_totp"):
         if not user.totp_secret:
@@ -224,8 +326,8 @@ def admin_home(request: Request, db: Session = Depends(get_db)) -> dict:
 
 @app.post(settings.admin_path + "/totp")
 def admin_totp(body: dict, request: Request, db: Session = Depends(get_db)) -> JSONResponse:
-    user = current_user(request, db)
-    if user is None or user.email.lower() != settings.owner_google_email.lower():
+    user = _owner_candidate(request, db)
+    if user is None:
         raise HTTPException(status_code=404)
     if not _totp_ok(user, str(body.get("code") or "")):
         raise HTTPException(status_code=401, detail="Fel kod.")
