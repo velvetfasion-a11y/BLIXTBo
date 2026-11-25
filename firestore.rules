@@ -61,6 +61,10 @@ service cloud.firestore {
     }
 
     // Landlord passwords and session cookies. Admin SDK only.
+    match /analytics/{eventId} {
+      allow read, write: if false;
+    }
+
     match /credentials/{uid}/{document=**} {
       allow read, write: if false;
     }

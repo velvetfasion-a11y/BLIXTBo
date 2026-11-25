@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, useState } from "react";
+import { track } from "@/lib/analytics";
 import { canAutoApply } from "@/lib/billing";
 import { createDemo, createFreshUser, createLoggedOut, queueForSource, segmentMatches, welcomeNotice } from "@/lib/data";
 import { signOutGoogle } from "@/lib/firebase/auth";
@@ -326,6 +327,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     commit({ ...current, dismissed: [...current.dismissed, listingId] });
     setUndo({ kind: "skip", listingId, applicationId: "" });
     setToast(`Överhoppad · ${listing?.address ?? "bostaden"}`);
+    track("swipe", { direction: "no" });
   }, []);
 
   const apply = useCallback((listingId: string, options?: { quiet?: boolean }) => {
@@ -377,6 +379,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         : { ...current.billing, usedAutoApplies: current.billing.usedAutoApplies + 1 },
     });
     setUndo({ kind: "apply", listingId, applicationId: id });
+    if (!listing.manualApply) track("swipe", { direction: "yes" });
+    track("apply", { sourceId: listing.sourceId, mode: listing.manualApply ? "manual" : "auto" });
     if (!options?.quiet) {
       setToast(
         position === 1

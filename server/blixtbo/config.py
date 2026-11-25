@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     trial_days: int = 3
     free_auto_apply_limit: int = 2
     public_app_url: str = "http://127.0.0.1:43123"
+    umami_api_url: str = ""
+    umami_api_token: str = ""
+    umami_website_id: str = ""
+    umami_db_password: str = ""
 
     def kek_bytes(self) -> bytes:
         if not self.worker_kek:

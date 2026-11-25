@@ -38,6 +38,27 @@ Premium kostar **99 kr/mån** efter **3 dagars** gratis provperiod. Beloppet och
 
 Utcheckningen skickar användaren till Stripe Checkout. Webhooken skriver rättigheten till `users/{uid}/billing/entitlement`. Bara servern får skriva det dokumentet. Under provperioden och som betalande Premium går automatiska ansökningar utan tak. En paus stänger av dem tills prenumerationen återupptas.
 
+## Drift på Ubuntu 24.04
+
+En VPS med 4 GB minne räcker. Umami delar Postgres med API:t, i en egen databas. Ingen ClickHouse.
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose-v2 nginx certbot python3-certbot-nginx
+sudo cp deploy/nginx/blixtbo.conf /etc/nginx/sites-available/blixtbo
+sudo ln -s /etc/nginx/sites-available/blixtbo /etc/nginx/sites-enabled/blixtbo
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d blixtbo.se -d www.blixtbo.se -d stats.blixtbo.se
+cd server
+cp .env.example .env
+# fyll i lösenord, UMAMI_APP_SECRET och Stripe-testnycklar
+docker compose up -d --build
+```
+
+`blixtbo.se` går till appen på port 43123. `stats.blixtbo.se` går till Umami på `127.0.0.1:3000`. Första inloggningen i Umami är `admin` / `umami`. Byt lösenordet, skapa en webbplats för `blixtbo.se` och en API-nyckel. Sätt `NEXT_PUBLIC_ANALYTICS_SRC=https://stats.blixtbo.se/script.js` och webbplatsens id. Sätt `UMAMI_API_URL`, `UMAMI_API_TOKEN` och `UMAMI_WEBSITE_ID` bara på servern. Init-skriptet för databasen körs när Postgres-volymen skapas. På en gammal volym, kör SQL:t i `server/postgres/init-umami.sh` en gång för hand.
+
+Plausible Community Edition kräver ClickHouse. Det är för tungt för den här maskinen, så vi kör Umami.
+
 ## Emulatorer
 
 ```bash

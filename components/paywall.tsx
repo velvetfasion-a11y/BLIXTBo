@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, Sheet } from "@/components/ui";
+import { track } from "@/lib/analytics";
 import { premiumPriceKr, trialDays } from "@/lib/billing";
 import { firebaseAuth, firebaseConfigured } from "@/lib/firebase/client";
 import { useStore } from "@/lib/store";
@@ -75,6 +76,7 @@ export function useBillingActions() {
     setError("");
     try {
       await postBilling("/billing/pause");
+      track("subscription_paused");
       store.setBilling({ ...store.billing, plan: "premium", status: "paused" });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Gick inte att pausa.");
