@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Boot } from "@/components/boot";
 import { Mark } from "@/components/mark";
+import { Statistik } from "@/components/statistik";
 import { Button, Field, Switch, cx } from "@/components/ui";
 import { SEGMENTS, segmentMatches } from "@/lib/data";
 import { formatDate, freshness, kr, relative, syncLabel } from "@/lib/format";
@@ -75,11 +76,9 @@ export function AdminHome() {
   const median = minutes.length ? [...minutes].sort((a, b) => a - b)[Math.floor(minutes.length / 2)] : null;
   const newest = [...store.listings].sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)).slice(0, 5);
   const slow = store.sources.filter((source) => source.health === "delayed" || !source.enabled);
-  const week = [18, 22, 15, 27, 19, 24, 14 + Math.min(store.applications.length, 10)];
-
   return (
     <div className="mx-auto max-w-5xl">
-      <p className="text-sm text-soft">Exempeldata, plus det som händer i den här webbläsaren</p>
+      <p className="text-sm text-soft">De fyra korten är exempeldata. Statistik är riktig data från servern.</p>
       <h1 className="mt-1 font-serif text-4xl tracking-[-0.03em]">Översikt</h1>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Hushåll i registret" value={String(store.directory.length)} detail={`${complete} med komplett profil`} />
@@ -87,20 +86,7 @@ export function AdminHome() {
         <Stat label="Aktiva annonser" value={String(activeListings)} detail={`${store.listings.length - activeListings} dolda`} />
         <Stat label="Källor igång" value={`${sourcesOn}/${store.sources.length}`} detail={slow.length ? `${slow.length} behöver tillsyn` : "Alla synkar"} />
       </div>
-      <section className="mt-6 rounded-3xl border border-line bg-card p-5">
-        <h2 className="text-sm font-medium">Ansökningar per dag</h2>
-        <p className="mt-1 text-xs text-faint">Exempel för sju dagar, sista stapeln inkluderar sessionen.</p>
-        <div className="mt-4 flex h-36 items-end gap-2">
-          {week.map((value, index) => (
-            <div key={index} className="flex h-full flex-1 flex-col justify-end gap-2">
-              <div className="flex h-28 items-end">
-                <div className="w-full rounded-t-lg bg-pine" style={{ height: `${Math.max(8, (value / 30) * 100)}%` }} />
-              </div>
-              <span className="text-center text-[10px] text-faint">{["−6", "−5", "−4", "−3", "−2", "−1", "idag"][index]}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <Statistik />
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className="rounded-3xl border border-line bg-card p-5">
           <h2 className="text-sm font-medium">Senaste annonser</h2>

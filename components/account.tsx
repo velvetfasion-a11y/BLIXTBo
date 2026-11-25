@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Boot } from "@/components/boot";
 import { IconChevron, IconLock } from "@/components/icons";
 import { Button, Field } from "@/components/ui";
+import { track } from "@/lib/analytics";
 import { signInWithGoogle, signOutGoogle } from "@/lib/firebase/auth";
 import { firebaseConfigured } from "@/lib/firebase/client";
 import { useStore } from "@/lib/store";
@@ -56,6 +57,8 @@ export function Account() {
         const result = await signInWithGoogle();
         const accountEmail = result.user.email || email;
         const accountName = result.user.displayName || name;
+        const created = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
+        track(created ? "signup" : "login");
         finish("google", accountEmail, accountName);
         await store.attachGoogle(result.user.uid);
         const token = await result.user.getIdToken();
@@ -102,6 +105,7 @@ export function Account() {
       setError("Koden är sex siffror.");
       return;
     }
+    track("signup");
     finish("email", email, name);
   }
 

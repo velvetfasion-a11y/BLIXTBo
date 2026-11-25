@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApplicationLimitSheet } from "@/components/application-limit";
+import { track } from "@/lib/analytics";
 import { canAutoApply } from "@/lib/billing";
 import { ConfirmApply } from "@/components/confirm-apply";
 import { Paywall } from "@/components/paywall";
@@ -309,7 +310,7 @@ function Deck({
               Mer om bostaden
             </Link>
             {top.manualApply ? (
-              <a href={top.applyUrl} target="_blank" rel="noreferrer" className="inline-flex h-14 items-center rounded-full border border-line px-4 text-sm font-medium">
+              <a href={top.applyUrl} target="_blank" rel="noreferrer" className="inline-flex h-14 items-center rounded-full border border-line px-4 text-sm font-medium" onClick={() => track("apply", { sourceId: top.sourceId, mode: "manual" })}>
                 Ansök själv
               </a>
             ) : (

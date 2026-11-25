@@ -82,6 +82,15 @@ class Notice(Base):
     read: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class AnalyticsEvent(Base):
+    __tablename__ = "analytics_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(40))
+    props: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
 

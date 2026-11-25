@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Fraunces } from "next/font/google";
+import { Analytics } from "@/components/analytics";
 import { StoreProvider } from "@/lib/store";
 import "./globals.css";
 
@@ -31,7 +32,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="sv" className={`${sans.variable} ${serif.variable} h-full antialiased`}>
       <body className="min-h-full bg-paper font-sans text-ink">
-        <StoreProvider>{children}</StoreProvider>
+        <StoreProvider>
+          <Analytics />
+          {children}
+        </StoreProvider>
       </body>
     </html>
   );

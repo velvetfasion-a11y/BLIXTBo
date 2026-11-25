@@ -11,6 +11,7 @@ import { IconChevron } from "@/components/icons";
 import { Button, StatusPill } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDate, freshness, kr, rok } from "@/lib/format";
+import { track } from "@/lib/analytics";
 import { canAutoApply } from "@/lib/billing";
 import { Paywall } from "@/components/paywall";
 import { atApplicationLimit } from "@/lib/limits";
@@ -147,7 +148,7 @@ function ListingInner() {
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
               {listing.manualApply ? (
-                <a href={listing.applyUrl} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center justify-center rounded-full border border-line bg-card px-5 text-base font-medium">
+                <a href={listing.applyUrl} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center justify-center rounded-full border border-line bg-card px-5 text-base font-medium" onClick={() => track("apply", { sourceId: listing.sourceId, mode: "manual" })}>
                   Ansök själv
                 </a>
               ) : (

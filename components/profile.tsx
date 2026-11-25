@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { SubscriptionCard } from "@/components/subscription";
 import { Ring, Switch } from "@/components/ui";
+import { track } from "@/lib/analytics";
 import { completeness } from "@/lib/profile";
 import { useStore } from "@/lib/store";
 
@@ -20,6 +21,12 @@ export function Profile() {
   useEffect(() => {
     document.title = "Profil · Blixtbo";
   }, []);
+
+  useEffect(() => {
+    const checkout = params.get("checkout");
+    if (checkout === "success") track("payment_success");
+    if (checkout === "cancel") track("payment_failed");
+  }, [params]);
 
   if (!user) return null;
 

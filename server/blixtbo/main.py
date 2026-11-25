@@ -1,5 +1,6 @@
 import json
 import secrets
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 import httpx
@@ -14,6 +15,7 @@ from blixtbo import landlords
 from blixtbo.config import settings
 from blixtbo.db import init_db, session
 from blixtbo.jobs import accept_approval, session_cookie_from_body
+from blixtbo.analytics import recent_events, record_event, registrations_per_day, umami_configured, umami_pageviews
 from blixtbo.billing import entitlement_from_event, firebase_uid_from_event, subscription_data
 from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
@@ -141,6 +143,69 @@ def health() -> dict:
     return {"ok": True}
 
 
+@app.post("/analytics/collect")
+def analytics_collect(body: dict, db: Session = Depends(get_db)) -> dict:
+    try:
+        record_event(db, str(body.get("event") or ""), body.get("data") if isinstance(body.get("data"), dict) else {})
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Ogiltig händelse.")
+    return {"ok": True}
+
+
+def _stats_allowed(request: Request, db: Session) -> bool:
+    secret = request.headers.get("x-blixtbo-stats") or ""
+    if secret and secret == settings.app_secret:
+        return True
+    return _owner_candidate(request, db) is not None and bool(request.cookies.get("blixtbo_totp"))
+
+
+@app.get(settings.admin_path + "/stats")
+def analytics_stats(request: Request, db: Session = Depends(get_db)) -> dict:
+    if not _stats_allowed(request, db):
+        raise HTTPException(status_code=404)
+    visitors = umami_pageviews()
+    return {
+        "source": "umami" if visitors is not None else "event-log",
+        "umami": umami_configured(),
+        "visitorsPerDay": visitors,
+        "registrationsPerDay": registrations_per_day(db),
+        "payingCustomers": _paying_customers(),
+        "revenue": _revenue(),
+        "events": recent_events(db),
+    }
+
+
+def _paying_customers() -> dict | None:
+    if not settings.stripe_secret_key.startswith("sk_test_"):
+        return None
+    import stripe
+
+    stripe.api_key = settings.stripe_secret_key
+    try:
+        active = stripe.Subscription.list(status="active", limit=100)
+        trialing = stripe.Subscription.list(status="trialing", limit=100)
+    except Exception:
+        return None
+    return {"active": len(active.data), "trialing": len(trialing.data)}
+
+
+def _revenue() -> list[dict] | None:
+    if not settings.stripe_secret_key.startswith("sk_test_"):
+        return None
+    import stripe
+
+    stripe.api_key = settings.stripe_secret_key
+    try:
+        invoices = stripe.Invoice.list(limit=100, status="paid")
+    except Exception:
+        return None
+    totals: dict[str, int] = {}
+    for invoice in invoices.data:
+        created = datetime.fromtimestamp(invoice.created, timezone.utc).date().isoformat()
+        totals[created] = totals.get(created, 0) + int(invoice.amount_paid or 0)
+    return [{"day": day, "amountOre": totals[day], "currency": "sek"} for day in sorted(totals)]
+
+
 def _write_entitlement(uid: str, entitlement: dict) -> None:
     if not uid or settings.data_backend != "firestore":
         return
@@ -244,6 +309,18 @@ async def billing_webhook(request: Request) -> dict:
     uid = firebase_uid_from_event(event)
     if entitlement and uid:
         _write_entitlement(uid, entitlement)
+    kind = event.get("type") if isinstance(event, dict) else event["type"]
+    db = session()
+    try:
+        if kind == "checkout.session.completed":
+            record_event(db, "payment_success")
+            record_event(db, "trial_started")
+        elif kind == "invoice.payment_failed":
+            record_event(db, "payment_failed")
+        elif kind == "customer.subscription.updated" and entitlement and entitlement.get("status") == "paused":
+            record_event(db, "subscription_paused")
+    finally:
+        db.close()
     return {"ok": True}
 
 
