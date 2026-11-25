@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     data_backend: str = "postgres"
     firebase_project_id: str = ""
     firebase_service_account: str = ""
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_id: str = ""
+    premium_price_kr: float = 99
+    trial_days: int = 3
+    free_auto_apply_limit: int = 2
+    public_app_url: str = "http://127.0.0.1:43123"
 
     def kek_bytes(self) -> bytes:
         if not self.worker_kek:

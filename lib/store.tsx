@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, useState } from "react";
+import { canAutoApply } from "@/lib/billing";
 import { createDemo, createFreshUser, createLoggedOut, queueForSource, segmentMatches, welcomeNotice } from "@/lib/data";
 import { signOutGoogle } from "@/lib/firebase/auth";
 import { pushState, type CloudState } from "@/lib/firebase/repository";
@@ -8,7 +9,7 @@ import { cloudUid, setCloudSession } from "@/lib/firebase/session";
 import { hydrateCloud, scheduleCloudSync, watchAuth } from "@/lib/firebase/sync";
 import { applicationLimit, atApplicationLimit, isActiveApplication } from "@/lib/limits";
 import { completeness, queueAlert } from "@/lib/profile";
-import type { AppStatus, Connection, CustomLandlord, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, Source, User } from "@/lib/types";
+import type { AppStatus, Billing, Connection, CustomLandlord, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, Source, User } from "@/lib/types";
 
 const KEY = "blixtbo-v1";
 const SERVER_STATE = createLoggedOut(0);
@@ -35,7 +36,12 @@ function getSnapshot(): Persisted {
   try {
     const parsed = JSON.parse(raw) as Persisted;
     if (parsed.version !== 1 || !Array.isArray(parsed.listings)) throw new Error("bad");
-    const value = { ...parsed, waiting: parsed.waiting ?? [], customLandlords: parsed.customLandlords ?? [] };
+    const value = {
+      ...parsed,
+      waiting: parsed.waiting ?? [],
+      customLandlords: parsed.customLandlords ?? [],
+      billing: parsed.billing ?? { plan: "free", status: "free", usedAutoApplies: 0 },
+    };
     cache = { raw, value };
     return value;
   } catch {
@@ -106,7 +112,8 @@ type Store = Persisted & {
   setCityAreas: (areas: string[], on: boolean) => void;
   clearFilters: () => void;
   skip: (listingId: string) => void;
-  apply: (listingId: string, options?: { quiet?: boolean }) => { status: "applied"; position: number } | { status: "connected-needed" | "exists" | "missing" | "limit" };
+  apply: (listingId: string, options?: { quiet?: boolean }) => { status: "applied"; position: number } | { status: "connected-needed" | "exists" | "missing" | "limit" | "paywall" };
+  setBilling: (billing: Billing) => void;
   deferListing: (listingId: string) => void;
   swapApplication: (applicationId: string, listingId: string) => void;
   setSourceLimit: (id: string, patch: Partial<Pick<Source, "applicationLimit" | "plusLimit" | "plusPriceKr" | "plusUrl">>) => void;
@@ -330,6 +337,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const connection = current.connections[listing.sourceId];
     if (!connection || connection.status !== "connected") return { status: "connected-needed" as const };
     if (atApplicationLimit(current.sources, current.applications, current.listings, listing.sourceId)) return { status: "limit" as const };
+    if (!listing.manualApply && !canAutoApply(current.billing)) return { status: "paywall" as const };
     const published = new Date(listing.publishedAt).getTime();
     const minutesAfter = Math.max(0, Math.round((Date.now() - published) / 60000));
     const position = minutesAfter < 15 ? 1 : minutesAfter < 60 ? 2 : minutesAfter < 180 ? 5 : 9;
@@ -364,6 +372,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ],
       waiting: current.waiting.filter((item) => item.listingId !== listingId),
       notifications: notice ? [notice, ...current.notifications] : current.notifications,
+      billing: listing.manualApply
+        ? current.billing
+        : { ...current.billing, usedAutoApplies: current.billing.usedAutoApplies + 1 },
     });
     setUndo({ kind: "apply", listingId, applicationId: id });
     if (!options?.quiet) {
@@ -537,6 +548,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     commit({ ...current, listings: [listing, ...current.listings] });
     setToast("Annonsen är publicerad i flödet");
     setUndo(null);
+  }, []);
+
+  const setBilling = useCallback((billing: Billing) => {
+    const current = latest();
+    if (!current) return;
+    commit({ ...current, billing });
   }, []);
 
   const saveCustomLandlord = useCallback((input: Omit<CustomLandlord, "id" | "createdAt" | "confirmed" | "applyMode"> & { id?: string }) => {
@@ -780,6 +797,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleListing,
       addListing,
       toggleSource,
+      setBilling,
       saveCustomLandlord,
       removeCustomLandlord,
       confirmCustomLandlord,
@@ -817,6 +835,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     toggleListing,
     addListing,
     toggleSource,
+    setBilling,
     saveCustomLandlord,
     removeCustomLandlord,
     confirmCustomLandlord,

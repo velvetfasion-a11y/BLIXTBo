@@ -53,6 +53,11 @@ service cloud.firestore {
         allow create, update: if signedInAs(uid) && noBankId(request.resource.data);
         allow delete: if signedInAs(uid);
       }
+
+      match /billing/{docId} {
+        allow read: if signedInAs(uid);
+        allow write: if false;
+      }
     }
 
     // Landlord passwords and session cookies. Admin SDK only.

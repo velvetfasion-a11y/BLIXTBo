@@ -14,6 +14,7 @@ from blixtbo import landlords
 from blixtbo.config import settings
 from blixtbo.db import init_db, session
 from blixtbo.jobs import accept_approval, session_cookie_from_body
+from blixtbo.billing import entitlement_from_event, firebase_uid_from_event, subscription_data
 from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
 from blixtbo.models import AuditLog, Job, LandlordLogin, Notice, User
@@ -137,6 +138,112 @@ def startup() -> None:
 
 @app.get("/health")
 def health() -> dict:
+    return {"ok": True}
+
+
+def _write_entitlement(uid: str, entitlement: dict) -> None:
+    if not uid or settings.data_backend != "firestore":
+        return
+    from blixtbo.firebase_app import firestore_client
+
+    firestore_client().collection("users").document(uid).collection("billing").document("entitlement").set(entitlement, merge=True)
+
+
+def _stripe():
+    import stripe
+
+    if not settings.stripe_secret_key.startswith("sk_test_"):
+        raise HTTPException(status_code=503, detail="Stripe-testnyckel saknas.")
+    stripe.api_key = settings.stripe_secret_key
+    return stripe
+
+
+@app.post("/billing/checkout")
+def billing_checkout(request: Request, db: Session = Depends(get_db)) -> dict:
+    user = user_from_firebase(request, db)
+    if user is None or not user.firebase_uid:
+        raise HTTPException(status_code=401, detail="Logga in med Google först.")
+    stripe = _stripe()
+    if not settings.stripe_price_id:
+        raise HTTPException(status_code=503, detail="STRIPE_PRICE_ID saknas.")
+    params = {
+        "mode": "subscription",
+        "client_reference_id": user.firebase_uid,
+        "line_items": [{"price": settings.stripe_price_id, "quantity": 1}],
+        "success_url": settings.public_app_url + "/profil?checkout=success",
+        "cancel_url": settings.public_app_url + "/profil?checkout=cancel",
+        "metadata": {"firebaseUid": user.firebase_uid},
+        "subscription_data": subscription_data(user.firebase_uid),
+    }
+    session = stripe.checkout.Session.create(**params)
+    return {"url": session.url}
+
+
+@app.post("/billing/portal")
+def billing_portal(request: Request, db: Session = Depends(get_db)) -> dict:
+    user = user_from_firebase(request, db)
+    if user is None or not user.firebase_uid:
+        raise HTTPException(status_code=401, detail="Logga in med Google först.")
+    stripe = _stripe()
+    customers = stripe.Customer.search(query=f"metadata['firebaseUid']:'{user.firebase_uid}'")
+    if not customers.data:
+        raise HTTPException(status_code=404, detail="Ingen Stripe-kund ännu.")
+    portal = stripe.billing_portal.Session.create(customer=customers.data[0].id, return_url=settings.public_app_url + "/profil")
+    return {"url": portal.url}
+
+
+def _subscription_for(user: User):
+    stripe = _stripe()
+    customers = stripe.Customer.search(query=f"metadata['firebaseUid']:'{user.firebase_uid}'")
+    if not customers.data:
+        raise HTTPException(status_code=404, detail="Ingen prenumeration.")
+    subs = stripe.Subscription.list(customer=customers.data[0].id, status="all", limit=1)
+    if not subs.data:
+        raise HTTPException(status_code=404, detail="Ingen prenumeration.")
+    return stripe, subs.data[0]
+
+
+@app.post("/billing/pause")
+def billing_pause(request: Request, db: Session = Depends(get_db)) -> dict:
+    user = user_from_firebase(request, db)
+    if user is None or not user.firebase_uid:
+        raise HTTPException(status_code=401, detail="Logga in med Google först.")
+    stripe, subscription = _subscription_for(user)
+    updated = stripe.Subscription.modify(subscription.id, pause_collection={"behavior": "void"})
+    raw = updated.to_dict() if hasattr(updated, "to_dict") else updated
+    entitlement = entitlement_from_event({"type": "customer.subscription.updated", "data": {"object": raw}})
+    _write_entitlement(user.firebase_uid, entitlement or {})
+    return {"status": "paused"}
+
+
+@app.post("/billing/resume")
+def billing_resume(request: Request, db: Session = Depends(get_db)) -> dict:
+    user = user_from_firebase(request, db)
+    if user is None or not user.firebase_uid:
+        raise HTTPException(status_code=401, detail="Logga in med Google först.")
+    stripe, subscription = _subscription_for(user)
+    updated = stripe.Subscription.modify(subscription.id, pause_collection="")
+    raw = updated.to_dict() if hasattr(updated, "to_dict") else updated
+    entitlement = entitlement_from_event({"type": "customer.subscription.updated", "data": {"object": raw}})
+    _write_entitlement(user.firebase_uid, entitlement or {})
+    return {"status": "active"}
+
+
+@app.post("/billing/webhook")
+async def billing_webhook(request: Request) -> dict:
+    stripe = _stripe()
+    payload = await request.body()
+    signature = request.headers.get("stripe-signature", "")
+    if not settings.stripe_webhook_secret:
+        raise HTTPException(status_code=503, detail="STRIPE_WEBHOOK_SECRET saknas.")
+    try:
+        event = stripe.Webhook.construct_event(payload, signature, settings.stripe_webhook_secret)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ogiltig webhook.")
+    entitlement = entitlement_from_event(event)
+    uid = firebase_uid_from_event(event)
+    if entitlement and uid:
+        _write_entitlement(uid, entitlement)
     return {"ok": True}
 
 

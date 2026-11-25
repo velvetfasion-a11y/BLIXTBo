@@ -11,6 +11,8 @@ import { IconChevron } from "@/components/icons";
 import { Button, StatusPill } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDate, freshness, kr, rok } from "@/lib/format";
+import { canAutoApply } from "@/lib/billing";
+import { Paywall } from "@/components/paywall";
 import { atApplicationLimit } from "@/lib/limits";
 import { assess } from "@/lib/profile";
 import { useStore } from "@/lib/store";
@@ -24,6 +26,7 @@ function ListingInner() {
   const [gate, setGate] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [limited, setLimited] = useState(false);
+  const [paywall, setPaywall] = useState(false);
 
   useEffect(() => {
     document.title = listing ? `${listing.address} · Blixtbo` : "Bostad · Blixtbo";
@@ -51,6 +54,10 @@ function ListingInner() {
     }
     if (atApplicationLimit(store.sources, store.applications, store.listings, listing!.sourceId)) {
       setLimited(true);
+      return;
+    }
+    if (!listing!.manualApply && !canAutoApply(store.billing)) {
+      setPaywall(true);
       return;
     }
     if (!assess(listing!, store.user?.profile ?? null).ready) {
@@ -166,6 +173,7 @@ function ListingInner() {
         />
       ) : null}
       <ApplicationLimitSheet listing={limited ? listing : null} onClose={() => setLimited(false)} />
+      <Paywall open={paywall} onClose={() => setPaywall(false)} />
       <ConfirmApply
         listing={confirm ? listing : null}
         onClose={() => setConfirm(false)}
