@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
+import { SubscriptionCard } from "@/components/subscription";
 import { Ring, Switch } from "@/components/ui";
 import { completeness } from "@/lib/profile";
 import { useStore } from "@/lib/store";
@@ -12,7 +13,9 @@ export function Profile() {
   const router = useRouter();
   const user = store.user;
   const score = user ? completeness(user.profile) : { score: 0, missing: [] };
+  const params = useSearchParams();
   const connected = store.sources.filter((source) => store.connections[source.id]?.status === "connected").length;
+  const previewPause = process.env.NODE_ENV === "development" && params.get("vy") === "paus";
 
   useEffect(() => {
     document.title = "Profil · Blixtbo";
@@ -48,6 +51,8 @@ export function Profile() {
         <Row href="/filter" title="Filter" detail="Område, hyra, storlek, inflytt" />
         <Row href="/kopplingar" title="Hyresvärdar" detail={`${connected} kopplade`} />
       </ul>
+
+      <SubscriptionCard preview={previewPause} />
 
       <section className="mt-6 rounded-3xl border border-line bg-card px-4 pb-4">
         <h2 className="pt-4 text-sm font-medium">Behåll din plats</h2>

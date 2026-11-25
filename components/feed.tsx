@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApplicationLimitSheet } from "@/components/application-limit";
+import { canAutoApply } from "@/lib/billing";
 import { ConfirmApply } from "@/components/confirm-apply";
+import { Paywall } from "@/components/paywall";
+import { QueueNudge } from "@/components/queue-nudge";
 import { Countdown } from "@/components/countdown";
 import { ConnectSheet } from "@/components/connect-sheet";
 import { EmptyState, StatusPill } from "@/components/ui";
@@ -20,6 +23,7 @@ export function Feed() {
   const [pendingApply, setPendingApply] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [limitId, setLimitId] = useState<string | null>(null);
+  const [paywall, setPaywall] = useState(false);
 
   useEffect(() => {
     document.title = "Hem · Blixtbo";
@@ -44,6 +48,7 @@ export function Feed() {
       <div className="mx-auto grid max-w-6xl lg:grid-cols-[minmax(320px,440px)_minmax(0,1fr)] lg:gap-8 lg:items-start">
         <div className="flex h-[calc(100dvh-6.75rem)] flex-col md:h-[calc(100dvh-4rem)]">
           {store.applications.some((item) => item.status === "erbjuden") ? <OfferBanner /> : null}
+          <QueueNudge />
           <header className="mb-3 flex shrink-0 items-end justify-between gap-3">
             <div>
               <p className="text-sm text-soft">{recent > 0 ? `${recent} publicerade de senaste timmarna` : "Bevakningen är på"}</p>
@@ -98,6 +103,10 @@ export function Feed() {
                     setLimitId(listing.id);
                     return false;
                   }
+                  if (!canAutoApply(store.billing)) {
+                    setPaywall(true);
+                    return false;
+                  }
                   if (!assess(listing, store.user?.profile ?? null).ready) {
                     setConfirmId(listing.id);
                     return false;
@@ -128,6 +137,7 @@ export function Feed() {
         />
       ) : null}
       <ApplicationLimitSheet listing={store.listings.find((item) => item.id === limitId) ?? null} onClose={() => setLimitId(null)} />
+      <Paywall open={paywall} onClose={() => setPaywall(false)} />
       <ConfirmApply
         listing={store.listings.find((item) => item.id === confirmId) ?? null}
         onClose={() => setConfirmId(null)}

@@ -722,6 +722,7 @@ export function createLoggedOut(now = Date.now()): Persisted {
     ],
     directory: DIRECTORY,
     prefs: { newListings: true, fees: true, status: true, keepQueues: true },
+    billing: { plan: "free", status: "free", usedAutoApplies: 0 },
   };
 }
 

@@ -180,6 +180,12 @@ export type Notice = {
   deadlineAt?: string;
 };
 
+export type Billing = {
+  plan: "free" | "premium";
+  status: "free" | "active" | "paused" | "canceled";
+  usedAutoApplies: number;
+};
+
 export type Prefs = {
   newListings: boolean;
   fees: boolean;
@@ -225,4 +231,5 @@ export type Persisted = {
   pushes: Push[];
   directory: DirectoryUser[];
   prefs: Prefs;
+  billing: Billing;
 };
