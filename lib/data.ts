@@ -452,10 +452,62 @@ const LISTINGS: SeedListing[] = [
     incomeMultiple: 3,
     active: true,
   },
+  homeqApplied("hq-horn", "Hornsgatan 88", "Södermalm", "Stockholm", 11900, 49, 2, "01", 60 * 24 * 6),
+  homeqApplied("hq-svea", "Sveavägen 44", "Vasastan", "Stockholm", 13100, 52, 2, "02", 60 * 24 * 8),
+  homeqApplied("hq-strand", "Kungsholms strand 16", "Kungsholmen", "Stockholm", 12840, 47, 2, "03", 60 * 24 * 11),
+  homeqApplied("hq-ring", "Ringvägen 102", "Södermalm", "Stockholm", 11250, 44, 2, "05", 60 * 24 * 14),
 ];
 
+function homeqApplied(
+  id: string,
+  address: string,
+  area: string,
+  city: string,
+  rent: number,
+  sqm: number,
+  rooms: number,
+  photoId: string,
+  ageMinutes: number,
+): SeedListing {
+  return {
+    id,
+    address,
+    area,
+    city,
+    rent,
+    sqm,
+    rooms,
+    floor: 2,
+    floors: 5,
+    moveIn: "2026-04-01",
+    ageMinutes,
+    deadlineHours: null,
+    sourceId: "homeq",
+    photos: [photo(photoId), photo("04")],
+    title: "Aktiv intresseanmälan",
+    description: "En pågående ansökan hos HomeQ. Platsen räknas mot taket på fem aktiva ansökningar.",
+    near: area,
+    features: ["Förstahand"],
+    requires: ["contract", "payslips", "letter"],
+    incomeMultiple: 3,
+    active: true,
+  };
+}
+
 export const SOURCE_SEED: Omit<Source, "enabled">[] = [
-  { id: "homeq", name: "HomeQ", kind: "Portal", blurb: "Köfri portal för privata hyresvärdar.", syncMin: 2, health: "ok", requiresBankId: false },
+  {
+    id: "homeq",
+    name: "HomeQ",
+    kind: "Portal",
+    blurb: "Köfri portal för privata hyresvärdar.",
+    syncMin: 2,
+    health: "ok",
+    requiresBankId: false,
+    applicationLimit: 5,
+    plusLimit: 10,
+    plusPriceKr: 349,
+    plusUrl: "https://www.homeq.se/plus",
+  },
   { id: "wahlin", name: "Wåhlin", kind: "Hyresvärd", blurb: "Bostäder i Stockholm, egen ansökan.", syncMin: 6, health: "ok", requiresBankId: true },
   { id: "heimstaden", name: "Heimstaden", kind: "Hyresvärd", blurb: "Lägenheter i flera städer.", syncMin: 11, health: "ok", requiresBankId: false },
   { id: "akelius", name: "Akelius", kind: "Hyresvärd", blurb: "Centrala lägenheter och egen kö.", syncMin: 190, health: "delayed", requiresBankId: false },
@@ -551,6 +603,19 @@ function demoProfile(now: number): Profile {
   };
 }
 
+function homeqApp(listingId: string, daysAgo: number, now: number): Application {
+  return {
+    id: `app-${listingId}`,
+    listingId,
+    status: "skickad",
+    appliedAt: hoursAgo(24 * daysAgo, now),
+    eventAt: hoursAgo(24 * daysAgo, now),
+    position: 3,
+    minutesAfterPublish: 20,
+    note: "Aktiv intresseanmälan hos HomeQ.",
+  };
+}
+
 function connected(ids: string[], email: string, now: number): Record<string, Connection> {
   const all = blankConnections();
   for (const id of ids) {
@@ -638,6 +703,7 @@ export function createLoggedOut(now = Date.now()): Persisted {
     filters: defaultFilters,
     connections: blankConnections(),
     applications: [],
+    waiting: [],
     queues: [],
     notifications: [],
     dismissed: [],
@@ -719,6 +785,10 @@ export function createDemo(now = Date.now()): Persisted {
       minutesAfterPublish: 180,
       note: "Hyresvärden valde ett annat hushåll.",
     },
+    homeqApp("hq-horn", 4, now),
+    homeqApp("hq-svea", 9, now),
+    homeqApp("hq-strand", 12, now),
+    homeqApp("hq-ring", 18, now),
   ];
 
   const listings = base.listings.map((listing) => {

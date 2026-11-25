@@ -311,15 +311,43 @@ export function AdminSources() {
         {store.sources.map((source) => {
           const count = store.listings.filter((listing) => listing.sourceId === source.id && listing.active).length;
           return (
-            <li key={source.id} className="flex items-center justify-between gap-4 rounded-3xl border border-line bg-card px-4 py-4">
-              <div>
-                <p className="text-sm font-medium">{source.name}</p>
-                <p className="mt-1 text-sm text-soft">
-                  {source.kind} · {count} synliga · {syncLabel(source.syncMin)}
-                  {source.health === "delayed" ? " · fördröjd" : ""}
-                </p>
+            <li key={source.id} className="rounded-3xl border border-line bg-card px-4 py-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">{source.name}</p>
+                  <p className="mt-1 text-sm text-soft">
+                    {source.kind} · {count} synliga · {syncLabel(source.syncMin)}
+                    {source.health === "delayed" ? " · fördröjd" : ""}
+                  </p>
+                </div>
+                <Switch on={source.enabled} label={`Aktivera ${source.name}`} onClick={() => store.toggleSource(source.id)} />
               </div>
-              <Switch on={source.enabled} label={`Aktivera ${source.name}`} onClick={() => store.toggleSource(source.id)} />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <LimitField
+                  label="Max aktiva ansökningar"
+                  value={source.applicationLimit}
+                  onChange={(value) => store.setSourceLimit(source.id, { applicationLimit: value })}
+                />
+                <LimitField
+                  label="Max med plus"
+                  value={source.plusLimit}
+                  onChange={(value) => store.setSourceLimit(source.id, { plusLimit: value })}
+                />
+                <LimitField
+                  label="Pluspris kr/mån"
+                  value={source.plusPriceKr}
+                  onChange={(value) => store.setSourceLimit(source.id, { plusPriceKr: value })}
+                />
+                <label className="block text-sm">
+                  <span className="text-soft">Länk till hyresvärdens plus</span>
+                  <input
+                    value={source.plusUrl ?? ""}
+                    placeholder="https://"
+                    onChange={(event) => store.setSourceLimit(source.id, { plusUrl: event.target.value })}
+                    className="mt-1 h-11 w-full rounded-2xl border border-line bg-paper px-3 outline-none focus:border-ink"
+                  />
+                </label>
+              </div>
             </li>
           );
         })}
@@ -375,6 +403,37 @@ export function AdminUsers() {
         })}
       </ul>
     </div>
+  );
+}
+
+function LimitField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | null | undefined;
+  onChange: (value: number | null) => void;
+}) {
+  return (
+    <label className="block text-sm">
+      <span className="text-soft">{label}</span>
+      <input
+        inputMode="numeric"
+        value={value ?? ""}
+        placeholder="Ingen gräns"
+        onChange={(event) => {
+          const trimmed = event.target.value.trim();
+          if (!trimmed) {
+            onChange(null);
+            return;
+          }
+          const parsed = Number(trimmed);
+          if (Number.isInteger(parsed) && parsed > 0) onChange(parsed);
+        }}
+        className="mt-1 h-11 w-full rounded-2xl border border-line bg-paper px-3 outline-none focus:border-ink"
+      />
+    </label>
   );
 }
 

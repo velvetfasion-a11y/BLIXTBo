@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ApplicationLimitSheet } from "@/components/application-limit";
 import { ConfirmApply } from "@/components/confirm-apply";
 import { Countdown } from "@/components/countdown";
 import { ConnectSheet } from "@/components/connect-sheet";
 import { EmptyState, StatusPill } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDateTime, freshness, kr, rokShort } from "@/lib/format";
+import { atApplicationLimit } from "@/lib/limits";
 import { assess, passesFilters } from "@/lib/profile";
 import { useStore } from "@/lib/store";
 import type { Listing } from "@/lib/types";
@@ -17,19 +19,21 @@ export function Feed() {
   const [gate, setGate] = useState<string | null>(null);
   const [pendingApply, setPendingApply] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [limitId, setLimitId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Hem · Blixtbo";
   }, []);
 
   const deck = useMemo(() => {
-    const applied = new Set(store.applications.map((item) => item.listingId));
+    const applied = new Set(store.applications.filter((item) => item.status !== "aterkallad").map((item) => item.listingId));
     const skipped = new Set(store.dismissed);
+    const waiting = new Set(store.waiting.map((item) => item.listingId));
     return store.listings
       .filter((listing) => passesFilters(listing, store.filters, store.sources))
-      .filter((listing) => !applied.has(listing.id) && !skipped.has(listing.id))
+      .filter((listing) => !applied.has(listing.id) && !skipped.has(listing.id) && !waiting.has(listing.id))
       .sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt));
-  }, [store.applications, store.dismissed, store.filters, store.listings, store.sources]);
+  }, [store.applications, store.dismissed, store.filters, store.listings, store.sources, store.waiting]);
 
   const recent = store.listings.filter((listing) => listing.active && listing.ageMinutes < 180).length;
 
@@ -89,6 +93,10 @@ export function Feed() {
                     setGate(listing.sourceId);
                     return false;
                   }
+                  if (atApplicationLimit(store.sources, store.applications, store.listings, listing.sourceId)) {
+                    setLimitId(listing.id);
+                    return false;
+                  }
                   if (!assess(listing, store.user?.profile ?? null).ready) {
                     setConfirmId(listing.id);
                     return false;
@@ -118,6 +126,7 @@ export function Feed() {
           }}
         />
       ) : null}
+      <ApplicationLimitSheet listing={store.listings.find((item) => item.id === limitId) ?? null} onClose={() => setLimitId(null)} />
       <ConfirmApply
         listing={store.listings.find((item) => item.id === confirmId) ?? null}
         onClose={() => setConfirmId(null)}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { ApplicationLimitSheet } from "@/components/application-limit";
 import { Boot } from "@/components/boot";
 import { ConfirmApply } from "@/components/confirm-apply";
 import { ConnectSheet } from "@/components/connect-sheet";
@@ -10,6 +11,7 @@ import { IconChevron } from "@/components/icons";
 import { Button, StatusPill } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDate, freshness, kr, rok } from "@/lib/format";
+import { atApplicationLimit } from "@/lib/limits";
 import { assess } from "@/lib/profile";
 import { useStore } from "@/lib/store";
 
@@ -21,6 +23,7 @@ function ListingInner() {
   const listing = store.listings.find((item) => item.id === id);
   const [gate, setGate] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [limited, setLimited] = useState(false);
 
   useEffect(() => {
     document.title = listing ? `${listing.address} · Blixtbo` : "Bostad · Blixtbo";
@@ -44,6 +47,10 @@ function ListingInner() {
   function apply() {
     if (!connected) {
       setGate(true);
+      return;
+    }
+    if (atApplicationLimit(store.sources, store.applications, store.listings, listing!.sourceId)) {
+      setLimited(true);
       return;
     }
     if (!assess(listing!, store.user?.profile ?? null).ready) {
@@ -122,7 +129,11 @@ function ListingInner() {
           <p className="text-sm text-soft">
             Källa: {source?.name}. {connected ? "Kontot är kopplat." : "Kontot är inte kopplat ännu."}
           </p>
-          {application ? (
+          {store.waiting.some((item) => item.listingId === listing.id) ? (
+            <div className="rounded-2xl bg-paper px-4 py-4 text-sm leading-relaxed text-soft">
+              Sparad i Väntar på plats. Du får en notis när en ansökan hos {source?.name ?? "hyresvärden"} avslutas.
+            </div>
+          ) : application && application.status !== "aterkallad" ? (
             <div className="rounded-2xl bg-pine-soft px-4 py-4 text-sm text-pine-deep">
               Ansökan skickad. {application.position === 1 ? "Du var först." : `Du var nummer ${application.position}.`}
             </div>
@@ -148,6 +159,7 @@ function ListingInner() {
           onClose={() => setGate(false)}
         />
       ) : null}
+      <ApplicationLimitSheet listing={limited ? listing : null} onClose={() => setLimited(false)} />
       <ConfirmApply
         listing={confirm ? listing : null}
         onClose={() => setConfirm(false)}
