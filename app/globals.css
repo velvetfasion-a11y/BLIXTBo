@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f3f0ea;
+  --paper-deep: #e6dfd4;
+  --card: #fffcf8;
+  --ink: #1c1916;
+  --soft: #5c564e;
+  --faint: #8a847b;
+  --line: #e3dcd2;
+  --pine: #146048;
+  --pine-deep: #0c3f30;
+  --pine-soft: #e5f3ed;
+  --clay: #8d4c2b;
+  --clay-soft: #f8eee7;
+  --gold: #8a6d1f;
+  --gold-soft: #f6f0dc;
+  --danger: #8e3330;
+  --danger-soft: #f8e9e6;
+  --info: #1e4d78;
+  --info-soft: #e7f0f7;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-pine: var(--pine);
+  --color-pine-deep: var(--pine-deep);
+  --color-pine-soft: var(--pine-soft);
+  --color-clay: var(--clay);
+  --color-clay-soft: var(--clay-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-familjen), "Avenir Next", "Segoe UI", sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, serif;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  ::selection {
+    background: #d5ebe3;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--pine);
+    outline-offset: 2px;
+  }
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.enter {
+  animation: enter 0.45s ease both;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.86);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+.pulse-ring {
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter,
+  .pulse-ring {
+    animation: none;
+  }
+}

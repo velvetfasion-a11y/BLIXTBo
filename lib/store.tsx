@@ -1,0 +1,601 @@
+"use client";
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, useState } from "react";
+import { createDemo, createFreshUser, createLoggedOut, queueForSource, segmentMatches, welcomeNotice } from "@/lib/data";
+import { completeness, queueAlert } from "@/lib/profile";
+import type { Connection, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, User } from "@/lib/types";
+
+const KEY = "blixtbo-v1";
+const SERVER_STATE = createLoggedOut(0);
+const EMPTY_STATE = createLoggedOut(0);
+
+let cache: { raw: string; value: Persisted } | null = null;
+
+function subscribe(callback: () => void) {
+  window.addEventListener("blixtbo-change", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("blixtbo-change", callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function getSnapshot(): Persisted {
+  const raw = localStorage.getItem(KEY) ?? "";
+  if (cache && cache.raw === raw) return cache.value;
+  if (!raw) {
+    cache = { raw: "", value: EMPTY_STATE };
+    return EMPTY_STATE;
+  }
+  try {
+    const parsed = JSON.parse(raw) as Persisted;
+    if (parsed.version !== 1 || !Array.isArray(parsed.listings)) throw new Error("bad");
+    cache = { raw, value: parsed };
+    return parsed;
+  } catch {
+    cache = { raw: "", value: EMPTY_STATE };
+    return EMPTY_STATE;
+  }
+}
+
+function getServerSnapshot() {
+  return SERVER_STATE;
+}
+
+function latest() {
+  return cache?.value && cache.value !== SERVER_STATE ? cache.value : getSnapshot();
+}
+
+function commit(next: Persisted) {
+  const raw = JSON.stringify(next);
+  try {
+    localStorage.setItem(KEY, raw);
+    cache = { raw, value: next };
+  } catch {
+    cache = { raw: localStorage.getItem(KEY) ?? "", value: next };
+  }
+  window.dispatchEvent(new Event("blixtbo-change"));
+}
+
+type Undo =
+  | { kind: "skip"; listingId: string; applicationId: string }
+  | { kind: "apply"; listingId: string; applicationId: string }
+  | null;
+
+type Store = Persisted & {
+  ready: boolean;
+  toast: string | null;
+  canUndo: boolean;
+  dismissToast: () => void;
+  undo: () => void;
+  signInDemo: () => void;
+  signIn: (input: { name: string; email: string; method: User["method"] }) => void;
+  logout: () => void;
+  reset: () => void;
+  updateProfile: (patch: Partial<Profile>) => void;
+  setDocument: (key: keyof Profile["documents"], file: Profile["documents"]["contract"]) => void;
+  setFilters: (patch: Partial<Filters>) => void;
+  toggleArea: (area: string) => void;
+  setCityAreas: (areas: string[], on: boolean) => void;
+  clearFilters: () => void;
+  skip: (listingId: string) => void;
+  apply: (listingId: string, options?: { quiet?: boolean }) => { status: "applied"; position: number } | { status: "connected-needed" | "exists" | "missing" };
+  updateAccount: (patch: { name?: string; email?: string; phone?: string; monthlyIncome?: number | null }) => void;
+  connect: (sourceId: string, email: string, options?: { quiet?: boolean }) => void;
+  disconnect: (sourceId: string) => void;
+  markRead: (id: string) => void;
+  markAllRead: () => void;
+  setPrefs: (patch: Partial<Prefs>) => void;
+  toggleListing: (id: string) => void;
+  addListing: (listing: Listing) => void;
+  toggleSource: (id: string) => void;
+  sendPush: (input: { title: string; body: string; segment: string }) => number;
+  answerOffer: (applicationId: string, accept: boolean) => void;
+  signContract: (applicationId: string) => void;
+};
+
+const Ctx = createContext<Store | null>(null);
+
+export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [toast, setToast] = useState<string | null>(null);
+  const [undo, setUndo] = useState<Undo>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => {
+      setToast(null);
+      setUndo(null);
+    }, 4800);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const signInDemo = useCallback(() => {
+    commit(createDemo());
+    setToast("Exempelkonto öppnat");
+    setUndo(null);
+  }, []);
+
+  const signIn = useCallback(
+    (input: { name: string; email: string; method: User["method"] }) => {
+      const current = latest() ?? createLoggedOut();
+      const user = createFreshUser(input);
+      commit({
+        ...current,
+        user,
+        filters: { ...current.filters, areas: [] },
+        connections: Object.fromEntries(
+          current.sources.map((source) => [source.id, { sourceId: source.id, status: "none" as const }]),
+        ),
+        applications: [],
+        queues: [],
+        notifications: [welcomeNotice()],
+        dismissed: [],
+        prefs: { newListings: true, fees: true, status: true, keepQueues: true },
+      });
+    },
+    [],
+  );
+
+  const logout = useCallback(() => {
+    const current = latest() ?? createLoggedOut();
+    const fresh = createLoggedOut();
+    commit({
+      ...fresh,
+      listings: current.listings,
+      sources: current.sources,
+      pushes: current.pushes,
+      directory: current.directory,
+    });
+    setToast(null);
+    setUndo(null);
+  }, []);
+
+  const reset = useCallback(() => {
+    commit(createLoggedOut());
+    setToast("Prototypen är återställd");
+    setUndo(null);
+  }, []);
+
+  const updateProfile = useCallback((patch: Partial<Profile>) => {
+    const current = latest();
+    if (!current?.user) return;
+    commit({
+      ...current,
+      user: { ...current.user, profile: { ...current.user.profile, ...patch } },
+    });
+  }, []);
+
+  const updateAccount = useCallback((patch: { name?: string; email?: string; phone?: string; monthlyIncome?: number | null }) => {
+    const current = latest();
+    if (!current?.user) return;
+    commit({
+      ...current,
+      user: {
+        ...current.user,
+        name: patch.name?.trim() || current.user.name,
+        email: patch.email?.trim() || current.user.email,
+        profile: {
+          ...current.user.profile,
+          phone: patch.phone !== undefined ? patch.phone : current.user.profile.phone ?? "",
+          monthlyIncome: patch.monthlyIncome !== undefined ? patch.monthlyIncome : current.user.profile.monthlyIncome,
+        },
+      },
+    });
+  }, []);
+
+  const setDocument = useCallback(
+    (key: keyof Profile["documents"], file: Profile["documents"]["contract"]) => {
+      const current = latest();
+      if (!current?.user) return;
+      commit({
+        ...current,
+        user: {
+          ...current.user,
+          profile: {
+            ...current.user.profile,
+            documents: { ...current.user.profile.documents, [key]: file },
+          },
+        },
+      });
+    },
+    [],
+  );
+
+  const setFilters = useCallback((patch: Partial<Filters>) => {
+    const current = latest();
+    if (!current) return;
+    commit({ ...current, filters: { ...current.filters, ...patch } });
+  }, []);
+
+  const toggleArea = useCallback((area: string) => {
+    const current = latest();
+    if (!current) return;
+    const has = current.filters.areas.includes(area);
+    commit({
+      ...current,
+      filters: {
+        ...current.filters,
+        areas: has ? current.filters.areas.filter((item) => item !== area) : [...current.filters.areas, area],
+      },
+    });
+  }, []);
+
+  const setCityAreas = useCallback((areas: string[], on: boolean) => {
+    const current = latest();
+    if (!current) return;
+    const rest = current.filters.areas.filter((area) => !areas.includes(area));
+    commit({
+      ...current,
+      filters: { ...current.filters, areas: on ? [...rest, ...areas] : rest },
+    });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    const current = latest();
+    if (!current) return;
+    commit({
+      ...current,
+      filters: { areas: [], maxRent: 20000, rooms: "any", minSqm: 0, minFloor: 0, moveIn: "" },
+    });
+  }, []);
+
+  const skip = useCallback((listingId: string) => {
+    const current = latest();
+    if (!current || current.dismissed.includes(listingId)) return;
+    const listing = current.listings.find((item) => item.id === listingId);
+    commit({ ...current, dismissed: [...current.dismissed, listingId] });
+    setUndo({ kind: "skip", listingId, applicationId: "" });
+    setToast(`Överhoppad · ${listing?.address ?? "bostaden"}`);
+  }, []);
+
+  const apply = useCallback((listingId: string, options?: { quiet?: boolean }) => {
+    const current = latest();
+    if (!current) return { status: "missing" as const };
+    const listing = current.listings.find((item) => item.id === listingId);
+    if (!listing) return { status: "missing" as const };
+    if (current.applications.some((item) => item.listingId === listingId)) return { status: "exists" as const };
+    const connection = current.connections[listing.sourceId];
+    if (!connection || connection.status !== "connected") return { status: "connected-needed" as const };
+    const published = new Date(listing.publishedAt).getTime();
+    const minutesAfter = Math.max(0, Math.round((Date.now() - published) / 60000));
+    const position = minutesAfter < 15 ? 1 : minutesAfter < 60 ? 2 : minutesAfter < 180 ? 5 : 9;
+    const id = `app-${Date.now()}`;
+    const source = current.sources.find((item) => item.id === listing.sourceId);
+    const note = position === 1 ? "Du var först att ansöka." : `Du var nummer ${position} att ansöka.`;
+    const notice: Notice | null = current.prefs.status
+      ? {
+          id,
+          kind: "status",
+          title: "Ansökan skickad",
+          body: `${listing.address} · ${position === 1 ? "du var först" : `plats ${position}`}`,
+          at: new Date().toISOString(),
+          read: false,
+          href: "/koll",
+        }
+      : null;
+    commit({
+      ...current,
+      applications: [
+        {
+          id,
+          listingId,
+          status: "skickad",
+          appliedAt: new Date().toISOString(),
+          eventAt: new Date().toISOString(),
+          position,
+          minutesAfterPublish: minutesAfter,
+          note,
+        },
+        ...current.applications,
+      ],
+      notifications: notice ? [notice, ...current.notifications] : current.notifications,
+    });
+    setUndo({ kind: "apply", listingId, applicationId: id });
+    if (!options?.quiet) {
+      setToast(
+        position === 1
+          ? `Ansökan skickad till ${source?.name ?? "hyresvärden"} · du var först`
+          : `Ansökan skickad till ${source?.name ?? "hyresvärden"} · plats ${position}`,
+      );
+    }
+    return { status: "applied" as const, position };
+  }, []);
+
+  const connect = useCallback((sourceId: string, email: string, options?: { quiet?: boolean }) => {
+    const current = latest();
+    if (!current) return;
+    const connection: Connection = {
+      sourceId,
+      status: "connected",
+      email,
+      connectedAt: new Date().toISOString(),
+    };
+    const born = queueForSource(sourceId);
+    const queues = born && !current.queues.some((queue) => queue.sourceId === sourceId) ? [...current.queues, born] : current.queues;
+    const source = current.sources.find((item) => item.id === sourceId);
+    commit({ ...current, connections: { ...current.connections, [sourceId]: connection }, queues });
+    if (!options?.quiet) setToast(`${source?.name ?? "Kontot"} är kopplat`);
+    setUndo(null);
+  }, []);
+
+  const disconnect = useCallback((sourceId: string) => {
+    const current = latest();
+    if (!current) return;
+    commit({
+      ...current,
+      connections: {
+        ...current.connections,
+        [sourceId]: { sourceId, status: "none" },
+      },
+    });
+  }, []);
+
+  const markRead = useCallback((id: string) => {
+    const current = latest();
+    if (!current) return;
+    commit({
+      ...current,
+      notifications: current.notifications.map((notice) => (notice.id === id ? { ...notice, read: true } : notice)),
+    });
+  }, []);
+
+  const markAllRead = useCallback(() => {
+    const current = latest();
+    if (!current) return;
+    commit({
+      ...current,
+      notifications: current.notifications.map((notice) => ({ ...notice, read: true })),
+    });
+  }, []);
+
+  const setPrefs = useCallback((patch: Partial<Prefs>) => {
+    const current = latest();
+    if (!current) return;
+    commit({ ...current, prefs: { ...current.prefs, ...patch } });
+  }, []);
+
+  const toggleListing = useCallback((id: string) => {
+    const current = latest();
+    if (!current) return;
+    commit({
+      ...current,
+      listings: current.listings.map((listing) => (listing.id === id ? { ...listing, active: !listing.active } : listing)),
+    });
+  }, []);
+
+  const addListing = useCallback((listing: Listing) => {
+    const current = latest();
+    if (!current) return;
+    commit({ ...current, listings: [listing, ...current.listings] });
+    setToast("Annonsen är publicerad i flödet");
+    setUndo(null);
+  }, []);
+
+  const toggleSource = useCallback((id: string) => {
+    const current = latest();
+    if (!current) return;
+    commit({
+      ...current,
+      sources: current.sources.map((source) => (source.id === id ? { ...source, enabled: !source.enabled } : source)),
+    });
+  }, []);
+
+  const answerOffer = useCallback((applicationId: string, accept: boolean) => {
+    const current = latest();
+    if (!current) return;
+    const application = current.applications.find((item) => item.id === applicationId);
+    if (!application || application.status !== "erbjuden") return;
+    const listing = current.listings.find((item) => item.id === application.listingId);
+    const address = listing?.address ?? "bostaden";
+    const status = accept ? "accepterad" : "avbojd";
+    const note = accept
+      ? "Du tackade ja. Nästa steg är att skriva under kontraktet och betala depositionen."
+      : application.affectsQueue
+        ? "Du tackade nej. Bostaden går vidare. Ett nej kan påverka köpoängen."
+        : "Du tackade nej. Bostaden går vidare till nästa hushåll.";
+    const notice: Notice = {
+      id: `n-answer-${Date.now()}`,
+      kind: "status",
+      title: accept ? `Du tackade ja till ${address}` : `Du tackade nej till ${address}`,
+      body: note,
+      at: new Date().toISOString(),
+      read: false,
+      href: `/erbjudande?id=${applicationId}`,
+    };
+    commit({
+      ...current,
+      applications: current.applications.map((item) =>
+        item.id === applicationId ? { ...item, status, note, eventAt: new Date().toISOString() } : item,
+      ),
+      notifications: [notice, ...current.notifications],
+    });
+    setToast(accept ? `Du tackade ja till ${address}` : `Erbjudandet på ${address} är avböjt`);
+  }, []);
+
+  const signContract = useCallback((applicationId: string) => {
+    const current = latest();
+    if (!current) return;
+    const application = current.applications.find((item) => item.id === applicationId);
+    if (!application || application.status !== "accepterad") return;
+    const listing = current.listings.find((item) => item.id === application.listingId);
+    const address = listing?.address ?? "bostaden";
+    const notice: Notice = {
+      id: `n-contract-${Date.now()}`,
+      kind: "status",
+      title: `Kontrakt för ${address}`,
+      body: "Kontraktet är markerat som signerat.",
+      at: new Date().toISOString(),
+      read: false,
+      href: "/koll",
+    };
+    commit({
+      ...current,
+      applications: current.applications.map((item) =>
+        item.id === applicationId
+          ? { ...item, status: "kontrakt", note: "Kontraktet är signerat. Inflytt enligt datumet i erbjudandet.", eventAt: new Date().toISOString() }
+          : item,
+      ),
+      notifications: [notice, ...current.notifications],
+    });
+    setToast(`Kontrakt signerat · ${address}`);
+  }, []);
+
+  const sendPush = useCallback((input: { title: string; body: string; segment: string }) => {
+    const current = latest();
+    if (!current) return 0;
+    const directoryHits = current.directory.filter((person) => segmentMatches(input.segment, person));
+    let recipients = directoryHits.length;
+    const user = current.user;
+    let notices = current.notifications;
+    if (user) {
+      const already = current.directory.some((person) => person.email === user.email);
+      const ctx = {
+        city: user.profile.currentCity,
+        completeness: completeness(user.profile).score,
+        queueWarning: current.queues.some((queue) => queueAlert(queue)),
+        applications: current.applications.length,
+      };
+      const matches = segmentMatches(input.segment, ctx);
+      if (!already && matches) recipients += 1;
+      if (matches) {
+        const notice: Notice = {
+          id: `push-${Date.now()}`,
+          kind: "system",
+          title: input.title.trim(),
+          body: input.body.trim(),
+          at: new Date().toISOString(),
+          read: false,
+          href: "/notiser",
+        };
+        notices = [notice, ...notices];
+      }
+    }
+    const push: Push = {
+      id: `push-${Date.now()}`,
+      title: input.title.trim(),
+      body: input.body.trim(),
+      segment: input.segment,
+      sentAt: new Date().toISOString(),
+      recipients,
+    };
+    commit({ ...current, pushes: [push, ...current.pushes], notifications: notices });
+    setToast(`Utskick skickat till ${recipients} ${recipients === 1 ? "person" : "personer"}`);
+    setUndo(null);
+    return recipients;
+  }, []);
+
+  const undoAction = useCallback(() => {
+    const current = latest();
+    const action = undo;
+    if (!current || !action) return;
+    if (action.kind === "skip") {
+      commit({ ...current, dismissed: current.dismissed.filter((id) => id !== action.listingId) });
+    } else {
+      commit({
+        ...current,
+        applications: current.applications.filter((item) => item.id !== action.applicationId),
+        notifications: current.notifications.filter((item) => item.id !== action.applicationId),
+      });
+    }
+    setUndo(null);
+    setToast(action.kind === "skip" ? "Bostaden ligger kvar" : "Ansökan ångrad");
+  }, [undo]);
+
+  const value = useMemo<Store>(() => {
+    return {
+      ...state,
+      ready: state !== SERVER_STATE,
+      toast,
+      canUndo: Boolean(undo),
+      dismissToast: () => {
+        setToast(null);
+        setUndo(null);
+      },
+      undo: undoAction,
+      signInDemo,
+      signIn,
+      logout,
+      reset,
+      updateProfile,
+      updateAccount,
+      setDocument,
+      setFilters,
+      toggleArea,
+      setCityAreas,
+      clearFilters,
+      skip,
+      apply,
+      connect,
+      disconnect,
+      markRead,
+      markAllRead,
+      setPrefs,
+      toggleListing,
+      addListing,
+      toggleSource,
+      sendPush,
+      answerOffer,
+      signContract,
+    };
+  }, [
+    state,
+    toast,
+    undo,
+    undoAction,
+    signInDemo,
+    signIn,
+    logout,
+    reset,
+    updateProfile,
+    updateAccount,
+    setDocument,
+    setFilters,
+    toggleArea,
+    setCityAreas,
+    clearFilters,
+    skip,
+    apply,
+    connect,
+    disconnect,
+    markRead,
+    markAllRead,
+    setPrefs,
+    toggleListing,
+    addListing,
+    toggleSource,
+    sendPush,
+    answerOffer,
+    signContract,
+  ]);
+
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      {toast ? (
+        <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4 md:top-6">
+          <div className="pointer-events-auto flex max-w-md items-center gap-4 rounded-full border border-line bg-ink px-4 py-3 text-sm text-paper shadow-[0_18px_50px_rgba(28,25,22,0.28)]">
+            <p className="min-w-0 flex-1 leading-snug">{toast}</p>
+            {undo ? (
+              <button type="button" className="font-semibold text-white" onClick={undoAction}>
+                Ångra
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </Ctx.Provider>
+  );
+}
+
+export function useStore() {
+  const value = useContext(Ctx);
+  if (!value) {
+    throw new Error("Store saknas");
+  }
+  return value;
+}
+
+export function useMaybeStore() {
+  return useContext(Ctx);
+}
