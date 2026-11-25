@@ -709,6 +709,7 @@ export function createLoggedOut(now = Date.now()): Persisted {
     dismissed: [],
     listings: stamp(LISTINGS, now),
     sources: sources(),
+    customLandlords: [],
     pushes: [
       {
         id: "p-seed",

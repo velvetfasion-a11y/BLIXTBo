@@ -57,5 +57,6 @@ Det skapar `blixtbo.html`. Öppna den direkt i webbläsaren. Exempelkontot finns
 - **Skapa konto** går via ett simulerat BankID eller e-post, och sedan en profilguide.
 - **Öppna exempelkonto** på första sidan hoppar till ett ifyllt konto med annonser, ansökningar, köer och notiser.
 - **Admin** finns under Profil, eller direkt på `/admin`.
+- **Egen hyresvärd** finns under Hyresvärdar. Bara ett namn räcker. Sidan bekräftas innan den används, och utan en färdig koppling visas Ansök själv.
 
 Varumärket är en platshållare och byts genom att söka på `Blixtbo`.

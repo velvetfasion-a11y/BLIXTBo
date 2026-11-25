@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ConnectSheet } from "@/components/connect-sheet";
+import { CustomLandlords } from "@/components/custom-landlords";
 import { IconChevron } from "@/components/icons";
 import { Button, PrivacyNote, cx } from "@/components/ui";
 import { useStore } from "@/lib/store";
@@ -15,7 +16,8 @@ export function Connections() {
     document.title = "Hyresvärdar · Blixtbo";
   }, []);
 
-  const connected = store.sources.filter((source) => store.connections[source.id]?.status === "connected").length;
+  const builtin = store.sources.filter((source) => !store.customLandlords.some((item) => item.id === source.id));
+  const connected = builtin.filter((source) => store.connections[source.id]?.status === "connected").length;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-5 py-6 md:px-8 md:py-10">
@@ -25,13 +27,14 @@ export function Connections() {
       </Link>
       <h1 className="mt-4 font-serif text-4xl tracking-[-0.03em]">Hyresvärdar</h1>
       <p className="mt-2 max-w-lg text-sm leading-relaxed text-soft">
-        {connected} av {store.sources.length} kopplade. Ansökan skickas bara dit kontot är kopplat.
+        {connected} av {builtin.length} kopplade. Ansökan skickas bara dit kontot är kopplat.
       </p>
       <div className="mt-5">
         <PrivacyNote />
       </div>
-      <ul className="mt-5 space-y-3">
-        {store.sources.map((source) => {
+      <CustomLandlords />
+      <ul className="mt-8 space-y-3">
+        {builtin.map((source) => {
           const link = store.connections[source.id];
           const on = link?.status === "connected";
           return (

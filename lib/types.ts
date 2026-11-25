@@ -80,6 +80,24 @@ export type Listing = {
   requires: Requirement[];
   incomeMultiple: number;
   active: boolean;
+  sourceName?: string;
+  manualApply?: boolean;
+  applyUrl?: string;
+  rankScore?: number;
+};
+
+export type CustomLandlordKind = "hyresvard" | "byggbolag" | "annat";
+
+export type CustomLandlord = {
+  id: string;
+  name: string;
+  websiteUrl: string;
+  country: string;
+  city: string;
+  kind: CustomLandlordKind;
+  confirmed: boolean;
+  applyMode: "adapter" | "manual";
+  createdAt: string;
 };
 
 export type SourceHealth = "ok" | "delayed";
@@ -203,6 +221,7 @@ export type Persisted = {
   dismissed: string[];
   listings: Listing[];
   sources: Source[];
+  customLandlords: CustomLandlord[];
   pushes: Push[];
   directory: DirectoryUser[];
   prefs: Prefs;

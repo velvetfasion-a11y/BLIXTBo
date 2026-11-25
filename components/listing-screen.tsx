@@ -139,9 +139,15 @@ function ListingInner() {
             </div>
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" variant="pine" className="h-12 w-full shrink-0 sm:flex-1" onClick={apply}>
-                {connected ? "Ansök nu" : `Koppla ${source?.name ?? "källan"} och ansök`}
-              </Button>
+              {listing.manualApply ? (
+                <a href={listing.applyUrl} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center justify-center rounded-full border border-line bg-card px-5 text-base font-medium">
+                  Ansök själv
+                </a>
+              ) : (
+                <Button size="lg" variant="pine" className="h-12 w-full shrink-0 sm:flex-1" onClick={apply}>
+                  {connected ? "Ansök nu" : `Koppla ${source?.name ?? "källan"} och ansök`}
+                </Button>
+              )}
               <Button size="lg" variant="outline" className="h-12 w-full shrink-0 sm:w-auto" onClick={() => { store.skip(listing.id); router.push("/hem"); }}>
                 Inte aktuell
               </Button>
