@@ -1,3 +1,4 @@
+import json
 import secrets
 from urllib.parse import urlencode
 
@@ -8,9 +9,10 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy.orm import Session
 
+from blixtbo import landlords
 from blixtbo.config import settings
 from blixtbo.db import init_db, session
-from blixtbo.jobs import accept_approval
+from blixtbo.jobs import accept_approval, session_cookie_from_body
 from blixtbo.matching import match_listing
 from blixtbo.models import AuditLog, Job, LandlordLogin, Notice, User
 from blixtbo.crypto import public_connection
@@ -159,6 +161,19 @@ def approve(source_id: str, body: dict, user: User = Depends(require_user), db: 
     method = str(body.get("method") or user.auth_method)
     purpose = str(body.get("purpose") or "create_account")
     accept_approval(db, user, source_id, method, purpose)
+    db.commit()
+    return {"queued": True, "source_id": source_id}
+
+
+@app.post("/connections/{source_id}/session")
+def save_session(source_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    if not landlords.requires_bankid(source_id):
+        raise HTTPException(status_code=400, detail="Den här hyresvärden kräver inte BankID.")
+    try:
+        cookie = session_cookie_from_body(body)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Bara hyresvärdens session tas emot. BankID sparas inte.")
+    db.add(Job(user_id=user.id, source_id=source_id, kind="store_session", payload=json.dumps({"cookie": cookie})))
     db.commit()
     return {"queued": True, "source_id": source_id}
 

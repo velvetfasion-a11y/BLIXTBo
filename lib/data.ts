@@ -456,7 +456,7 @@ const LISTINGS: SeedListing[] = [
 
 export const SOURCE_SEED: Omit<Source, "enabled">[] = [
   { id: "homeq", name: "HomeQ", kind: "Portal", blurb: "Köfri portal för privata hyresvärdar.", syncMin: 2, health: "ok", requiresBankId: false },
-  { id: "wahlin", name: "Wåhlin", kind: "Hyresvärd", blurb: "Bostäder i Stockholm, egen ansökan.", syncMin: 6, health: "ok", requiresBankId: false },
+  { id: "wahlin", name: "Wåhlin", kind: "Hyresvärd", blurb: "Bostäder i Stockholm, egen ansökan.", syncMin: 6, health: "ok", requiresBankId: true },
   { id: "heimstaden", name: "Heimstaden", kind: "Hyresvärd", blurb: "Lägenheter i flera städer.", syncMin: 11, health: "ok", requiresBankId: false },
   { id: "akelius", name: "Akelius", kind: "Hyresvärd", blurb: "Centrala lägenheter och egen kö.", syncMin: 190, health: "delayed", requiresBankId: false },
   { id: "qasa", name: "Qasa", kind: "Portal", blurb: "Förstahandskontrakt via Qasa.", syncMin: 4, health: "ok", requiresBankId: false },
@@ -465,7 +465,7 @@ export const SOURCE_SEED: Omit<Source, "enabled">[] = [
   { id: "boplatssyd", name: "Boplats Syd", kind: "Kommunal kö", blurb: "Malmö och sydvästra Skåne.", syncMin: 35, health: "ok", requiresBankId: true },
   { id: "uppsala", name: "Uppsala Bostadsförmedling", kind: "Kommunal kö", blurb: "Kommunal kö i Uppsala.", syncMin: 60 * 9, health: "delayed", requiresBankId: true },
   { id: "wallenstam", name: "Wallenstam", kind: "Hyresvärd", blurb: "Egna bostäder, ofta via HomeQ.", syncMin: 9, health: "ok", requiresBankId: false },
-  { id: "stena", name: "Stena Fastigheter", kind: "Hyresvärd", blurb: "Bostäder i storstäderna.", syncMin: 15, health: "ok", requiresBankId: false },
+  { id: "stena", name: "Stena Fastigheter", kind: "Hyresvärd", blurb: "Bostäder i storstäderna.", syncMin: 15, health: "ok", requiresBankId: true },
 ];
 
 export const DIRECTORY: DirectoryUser[] = [

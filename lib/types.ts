@@ -100,6 +100,7 @@ export type Connection = {
   status: "connected" | "none";
   email?: string;
   connectedAt?: string;
+  bankIdSession?: boolean;
 };
 
 export type AppStatus = "skickad" | "visning" | "erbjuden" | "accepterad" | "avbojd" | "kontrakt" | "nekad";

@@ -51,6 +51,8 @@ Backups are `pg_dump` of the database volume. Losing `WORKER_KEK` makes every st
 
 A user approves once in the app, with Google or an email code. The worker then creates the landlord account, generates the password, and stores it as ciphertext under that user's data key. Later apply and renew jobs decrypt it only inside the worker, log in, and do the task.
 
-If the site says the password is wrong, or the session is dead and a fresh login fails, the connection is marked `needs_user` and the user gets a notice. The worker does not guess a new password. A landlord that asks for BankID is left for the user to approve on their own phone. That step is never stored.
+If the site says the password is wrong, or the session is dead and a fresh login fails, the connection is marked `needs_user` and the user gets a notice. The worker does not guess a new password.
+
+Each landlord has a `requires_bankid` flag. Wåhlin and Stena Fastigheter are examples that require it. The worker does not script that login. It pauses the job (`waiting_bankid`) and notifies the user to open BankID on their own device, at the landlord, not at Blixtbo. When the landlord session comes back, the worker stores only that session cookie, encrypted with the user's data key, and deletes the plaintext from the job. Personal numbers, autostart tokens, signatures, and any other BankID field are refused and never written. A later renewal pauses again and sends a new notice, because the landlord may ask for BankID once more.
 
 Admin list endpoints return email, name, and connection status. They do not select the ciphertext or the wrapped key.
