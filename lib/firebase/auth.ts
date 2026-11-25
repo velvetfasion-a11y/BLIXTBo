@@ -1,7 +1,35 @@
-import { GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  getRedirectResult,
+  signInWithCredential,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  type UserCredential,
+} from "firebase/auth";
 import { firebaseAuth, firebaseConfigured, usingEmulators } from "@/lib/firebase/client";
+import { googleErrorMessage, isMobileSafari, isPopupBlocked } from "@/lib/firebase/google-browser";
 
-export async function signInWithGoogle() {
+export { googleErrorMessage, isMobileSafari, isPopupBlocked };
+
+let redirectResult: Promise<UserCredential | null> | null = null;
+
+function googleProvider() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  return provider;
+}
+
+function redirectToGoogle(auth: ReturnType<typeof firebaseAuth>, provider: GoogleAuthProvider) {
+  return signInWithRedirect(auth, provider).then(() => null);
+}
+
+/**
+ * Popup first. Mobile Safari and blocked popups use a full-page redirect;
+ * call `takeGoogleRedirectResult` on the next load to finish that sign-in.
+ * Resolves to null when the browser is leaving for Google.
+ */
+export async function signInWithGoogle(): Promise<UserCredential | null> {
   if (!firebaseConfigured()) {
     throw new Error("Firebase är inte konfigurerat.");
   }
@@ -17,9 +45,21 @@ export async function signInWithGoogle() {
     );
     return signInWithCredential(auth, credential);
   }
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  return signInWithPopup(auth, provider);
+  const provider = googleProvider();
+  if (isMobileSafari()) return redirectToGoogle(auth, provider);
+  try {
+    return await signInWithPopup(auth, provider);
+  } catch (error) {
+    if (!isPopupBlocked(error)) throw error;
+    return redirectToGoogle(auth, provider);
+  }
+}
+
+/** Result of a redirect started by `signInWithGoogle`. Safe to call more than once. */
+export function takeGoogleRedirectResult() {
+  if (typeof window === "undefined" || !firebaseConfigured() || usingEmulators()) return Promise.resolve(null);
+  if (!redirectResult) redirectResult = getRedirectResult(firebaseAuth());
+  return redirectResult;
 }
 
 export async function signOutGoogle() {
