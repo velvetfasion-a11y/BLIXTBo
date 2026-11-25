@@ -81,7 +81,7 @@ type Store = Persisted & {
   skip: (listingId: string) => void;
   apply: (listingId: string, options?: { quiet?: boolean }) => { status: "applied"; position: number } | { status: "connected-needed" | "exists" | "missing" };
   updateAccount: (patch: { name?: string; email?: string; phone?: string; monthlyIncome?: number | null }) => void;
-  connect: (sourceId: string, email: string, options?: { quiet?: boolean }) => void;
+  connect: (sourceId: string, email: string, options?: { quiet?: boolean; bankIdSession?: boolean }) => void;
   disconnect: (sourceId: string) => void;
   markRead: (id: string) => void;
   markAllRead: () => void;
@@ -302,19 +302,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { status: "applied" as const, position };
   }, []);
 
-  const connect = useCallback((sourceId: string, email: string, options?: { quiet?: boolean }) => {
+  const connect = useCallback((sourceId: string, email: string, options?: { quiet?: boolean; bankIdSession?: boolean }) => {
     const current = latest();
     if (!current) return;
+    const source = current.sources.find((item) => item.id === sourceId);
+    const bankIdSession = Boolean(options?.bankIdSession && source?.requiresBankId);
     const connection: Connection = {
       sourceId,
       status: "connected",
       email,
       connectedAt: new Date().toISOString(),
+      bankIdSession,
     };
     const born = queueForSource(sourceId);
     const queues = born && !current.queues.some((queue) => queue.sourceId === sourceId) ? [...current.queues, born] : current.queues;
-    const source = current.sources.find((item) => item.id === sourceId);
-    commit({ ...current, connections: { ...current.connections, [sourceId]: connection }, queues });
+    const notice: Notice | null = bankIdSession
+      ? {
+          id: `n-bankid-${sourceId}-${Date.now()}`,
+          kind: "system",
+          title: `${source?.name ?? "Hyresvärden"} är kopplat`,
+          body: `Sessionen hos ${source?.name ?? "hyresvärden"} är kopplad. En förnyelse kan kräva ett nytt BankID-godkännande. Du får en notis då. Blixtbo ser inte ditt BankID.`,
+          at: new Date().toISOString(),
+          read: false,
+          href: "/kopplingar",
+        }
+      : null;
+    commit({
+      ...current,
+      connections: { ...current.connections, [sourceId]: connection },
+      queues,
+      notifications: notice ? [notice, ...current.notifications] : current.notifications,
+    });
     if (!options?.quiet) setToast(`${source?.name ?? "Kontot"} är kopplat`);
     setUndo(null);
   }, []);

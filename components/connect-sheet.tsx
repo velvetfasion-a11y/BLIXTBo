@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { IconCheck } from "@/components/icons";
+import { SourceMark } from "@/components/source-mark";
 import { Button, PrivacyNote, Sheet, cx } from "@/components/ui";
 import { kr, parseMoney } from "@/lib/format";
 import { assess } from "@/lib/profile";
@@ -31,7 +32,7 @@ export function ConnectSheet({
   const source = store.sources.find((item) => item.id === sourceId);
   const user = store.user;
   const [mode, setMode] = useState<"create" | "existing">(intent === "login" ? "existing" : "create");
-  const [step, setStep] = useState<"review" | "approve" | "done">("review");
+  const [step, setStep] = useState<"review" | "approve" | "bankid" | "done">("review");
   const [phase, setPhase] = useState<"idle" | "wait" | "done">("idle");
   const [editing, setEditing] = useState<"details" | "documents" | null>(null);
   const [position, setPosition] = useState<number | null>(null);
@@ -50,21 +51,44 @@ export function ConnectSheet({
     setEditing(null);
   }
 
+  function finishConnect(bankIdSession: boolean) {
+    if (!sourceId) return;
+    store.connect(sourceId, email.trim() || user?.email || "", { quiet: true, bankIdSession });
+    let nextPosition: number | null = null;
+    if (listing) {
+      const result = store.apply(listing.id, { quiet: true });
+      if (result.status === "applied") nextPosition = result.position;
+    }
+    setPosition(nextPosition);
+    setPhase("done");
+    setStep("done");
+  }
+
   function approve() {
     if (!sourceId || phase !== "idle") return;
     store.dismissToast();
     setPhase("wait");
     window.setTimeout(() => {
-      store.connect(sourceId, email.trim() || user?.email || "", { quiet: true });
-      let nextPosition: number | null = null;
-      if (listing) {
-        const result = store.apply(listing.id, { quiet: true });
-        if (result.status === "applied") nextPosition = result.position;
+      if (source?.requiresBankId) {
+        setPhase("idle");
+        setStep("bankid");
+        return;
       }
-      setPosition(nextPosition);
-      setPhase("done");
-      setStep("done");
+      finishConnect(false);
     }, 1300);
+  }
+
+  function openBankId() {
+    if (!sourceId || phase !== "idle") return;
+    setPhase("wait");
+    const link = document.createElement("a");
+    link.href = "bankid:///";
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => finishConnect(true), 700);
   }
 
   if (!source) return null;
@@ -90,21 +114,57 @@ export function ConnectSheet({
         ? `${source.name} är kopplat – ansökan skickad`
         : `${source.name} är kopplat`;
 
+  const stepLabels = source.requiresBankId ? ["Granska", "Godkänn", "BankID", "Klart"] : ["Granska", "Godkänn", "Klart"];
+  const stepIndex = source.requiresBankId
+    ? step === "review"
+      ? 0
+      : step === "approve"
+        ? 1
+        : step === "bankid"
+          ? 2
+          : 3
+    : step === "review"
+      ? 0
+      : step === "approve"
+        ? 1
+        : 2;
+  const dialogTitle =
+    step === "bankid"
+      ? `BankID hos ${source.name}`
+      : step === "done"
+        ? source.requiresBankId
+          ? `Sessionen hos ${source.name} är kopplad`
+          : success
+        : step === "approve"
+          ? "Bekräfta en gång"
+          : headline;
+
   return (
-    <Sheet open={open} title={headline} onClose={onClose}>
-      <Steps current={step === "review" ? 0 : step === "approve" ? 1 : 2} />
+    <Sheet open={open} title={dialogTitle} onClose={onClose}>
+      <Steps labels={stepLabels} current={stepIndex} />
       {step === "review" ? (
         <div className="mt-5 space-y-4">
           <h2 className="font-serif text-[1.7rem] leading-tight tracking-[-0.03em]">{headline}</h2>
           {mode === "create" ? (
             <ol className="space-y-2 text-sm leading-relaxed text-soft">
               <li>1. Ett konto skapas hos {source.name} med uppgifterna nedan.</li>
-              <li>2. {listing ? `Ansökan till ${listing.address} skickas i samma stund.` : "Du kan sedan svara ja utan att logga in igen."}</li>
-              <li>3. Nästa bostad hos {source.name} kräver ingen ny inloggning.</li>
+              {source.requiresBankId ? (
+                <>
+                  <li>2. Du loggar in hos {source.name} med BankID på din egen enhet. Inte hos Blixtbo.</li>
+                  <li>3. En förnyelse kan kräva ett nytt BankID-godkännande. Du får en notis.</li>
+                </>
+              ) : (
+                <>
+                  <li>2. {listing ? `Ansökan till ${listing.address} skickas i samma stund.` : "Du kan sedan svara ja utan att logga in igen."}</li>
+                  <li>3. Nästa bostad hos {source.name} kräver ingen ny inloggning.</li>
+                </>
+              )}
             </ol>
           ) : (
             <p className="text-sm leading-relaxed text-soft">
-              Du har redan konto. Ett godkännande räcker. Blixtbo kan därefter skicka ansökningar och läsa status åt dig. Inget nytt konto skapas.
+              {source.requiresBankId
+                ? `Du har redan konto. Efter godkännandet loggar du in hos ${source.name} med BankID på din egen enhet. Blixtbo ser inte det BankID:t.`
+                : "Du har redan konto. Ett godkännande räcker. Blixtbo kan därefter skicka ansökningar och läsa status åt dig. Inget nytt konto skapas."}
             </p>
           )}
 
@@ -192,9 +252,11 @@ export function ConnectSheet({
         <div className="mt-5 space-y-4">
           <h2 className="font-serif text-[1.7rem] leading-tight tracking-[-0.03em]">Bekräfta en gång</h2>
           <p className="text-sm leading-relaxed text-soft">
-            {mode === "create"
-              ? `Ett godkännande i appen räcker. Då skapar Blixtbo kontot hos ${source.name} och kan ansöka åt dig utan att du loggar in igen.`
-              : `Ett godkännande i appen räcker. Då kopplas ditt konto hos ${source.name}, och nästa ansökan går utan en ny inloggning.`}
+            {source.requiresBankId
+              ? `Ett godkännande här gäller bara Blixtbo. Inloggningen hos ${source.name} gör du i nästa steg, med BankID på din egen enhet.`
+              : mode === "create"
+                ? `Ett godkännande i appen räcker. Då skapar Blixtbo kontot hos ${source.name} och kan ansöka åt dig utan att du loggar in igen.`
+                : `Ett godkännande i appen räcker. Då kopplas ditt konto hos ${source.name}, och nästa ansökan går utan en ny inloggning.`}
           </p>
           <div className="rounded-3xl border border-line bg-card px-5 py-6">
             <p className="text-xs font-medium tracking-wide text-soft">{user?.method === "apple" ? "APPLE" : user?.method === "email" ? "ENGÅNGSKOD" : "GOOGLE"}</p>
@@ -202,17 +264,14 @@ export function ConnectSheet({
               {phase === "done" ? "Godkänt" : phase === "wait" ? "Väntar på bekräftelse…" : user?.method === "email" ? "Bekräfta med e-postkod" : user?.method === "apple" ? "Bekräfta med Apple" : "Bekräfta med Google"}
             </p>
             <p className="mt-2 text-sm leading-relaxed text-soft">
-              {name ? `${name} ger Blixtbo lov att hantera ${source.name}.` : `Ge Blixtbo lov att hantera ${source.name}.`} Lösenordet skapas på din enhet. Vi ser det inte.
+              {source.requiresBankId
+                ? `Nästa steg är BankID hos ${source.name}. Blixtbo ser det inte och sparar det inte.`
+                : `${name ? `${name} ger Blixtbo lov att hantera ${source.name}.` : `Ge Blixtbo lov att hantera ${source.name}.`} Lösenordet skapas på din enhet. Vi ser det inte.`}
             </p>
             <Button size="lg" className="mt-5 w-full" disabled={phase !== "idle"} onClick={approve}>
               {phase === "idle" ? "Bekräfta en gång" : phase === "wait" ? "Väntar…" : "Godkänt"}
             </Button>
           </div>
-          {source.requiresBankId ? (
-            <p className="rounded-2xl bg-clay-soft px-4 py-3 text-sm leading-relaxed text-clay">
-              {source.name} ber om BankID i ett eget steg. Det godkänner du själv på mobilen. Blixtbo ser inte den legitimeringen och kan inte göra den åt dig.
-            </p>
-          ) : null}
           <PrivacyNote />
           <button type="button" className="text-sm text-soft" onClick={() => setStep("review")}>
             Tillbaka
@@ -220,19 +279,72 @@ export function ConnectSheet({
         </div>
       ) : null}
 
+      {step === "bankid" ? (
+        <div className="mt-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <SourceMark id={source.id} name={source.name} />
+            <div>
+              <p className="text-xs text-soft">Hyresvärd</p>
+              <p className="text-lg font-semibold tracking-tight">{source.name}</p>
+            </div>
+          </div>
+          <h2 className="font-serif text-[1.65rem] leading-tight tracking-[-0.03em]">
+            Den här hyresvärden kräver BankID. Du loggar in hos {source.name} – inte hos Blixtbo.
+          </h2>
+          <div className="space-y-2 rounded-2xl bg-paper-deep px-4 py-3 text-sm leading-relaxed">
+            <p>Vi ser aldrig ditt BankID och sparar det inte.</p>
+            <p>BankID ska visa {source.name}. Godkänn bara om det namnet står där.</p>
+            <p>Godkänn aldrig en BankID-förfrågan du inte själv har startat.</p>
+          </div>
+          <Button size="lg" className="w-full" disabled={phase !== "idle"} onClick={openBankId}>
+            {phase === "wait" ? "Öppnar BankID…" : "Öppna BankID"}
+          </Button>
+          <p className="text-sm leading-relaxed text-soft">
+            Knappen öppnar BankID på den här enheten, för inloggningen hos {source.name}.
+          </p>
+          <button type="button" className="text-sm text-soft" onClick={() => { setPhase("idle"); setStep("approve"); }}>
+            Tillbaka
+          </button>
+        </div>
+      ) : null}
+
       {step === "done" ? (
         <div className="mt-6 text-center">
+          {source.requiresBankId ? (
+            <div className="mb-5 flex items-center justify-center gap-3 text-left">
+              <SourceMark id={source.id} name={source.name} />
+              <div>
+                <p className="text-xs text-soft">Hyresvärd</p>
+                <p className="text-lg font-semibold tracking-tight">{source.name}</p>
+              </div>
+            </div>
+          ) : null}
           <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-pine-soft text-pine">
             <IconCheck className="h-7 w-7" />
           </div>
-          <h2 className="mt-5 font-serif text-[1.7rem] leading-tight tracking-[-0.03em]">{success}</h2>
+          <h2 className="mt-5 font-serif text-[1.7rem] leading-tight tracking-[-0.03em]">
+            {source.requiresBankId ? `Sessionen hos ${source.name} är kopplad` : success}
+          </h2>
           <p className="mt-3 text-sm leading-relaxed text-soft">
-            {position === 1
-              ? "Du var först på den här bostaden."
-              : position
-                ? `Du var nummer ${position} att ansöka.`
-                : `Nästa ja hos ${source.name} går utan en ny inloggning.`}
-            {" "}Du kan koppla bort {source.name} när som helst under Hyresvärdar.
+            {source.requiresBankId ? (
+              <>
+                {position === 1
+                  ? "Du var först på den här bostaden. "
+                  : position
+                    ? `Du var nummer ${position} att ansöka. `
+                    : null}
+                Förnyelser kan behöva ett nytt BankID-godkännande. Du får en notis när det behövs.
+              </>
+            ) : (
+              <>
+                {position === 1
+                  ? "Du var först på den här bostaden."
+                  : position
+                    ? `Du var nummer ${position} att ansöka.`
+                    : `Nästa ja hos ${source.name} går utan en ny inloggning.`}
+                {" "}Du kan koppla bort {source.name} när som helst under Hyresvärdar.
+              </>
+            )}
           </p>
           <Button size="lg" className="mt-6 w-full" onClick={onClose}>
             Fortsätt
@@ -254,8 +366,7 @@ function MatchNote({ listing }: { listing: Listing }) {
   );
 }
 
-function Steps({ current }: { current: 0 | 1 | 2 }) {
-  const labels = ["Granska", "Godkänn", "Klart"];
+function Steps({ labels, current }: { labels: string[]; current: number }) {
   return (
     <ol className="flex items-center gap-2">
       {labels.map((label, index) => (

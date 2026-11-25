@@ -47,11 +47,18 @@ export function Connections() {
                 </span>
               </div>
               {on ? (
-                <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-                  <p className="truncate text-soft">{link?.email}</p>
-                  <button type="button" className="text-clay" onClick={() => store.disconnect(source.id)}>
-                    Koppla från
-                  </button>
+                <div className="mt-4 space-y-3">
+                  {source.requiresBankId ? (
+                    <p className="text-sm leading-relaxed text-soft">
+                      Förnyelse kan kräva ett nytt BankID-godkännande. Du får en notis.
+                    </p>
+                  ) : null}
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <p className="truncate text-soft">{link?.email}</p>
+                    <button type="button" className="text-clay" onClick={() => store.disconnect(source.id)}>
+                      Koppla från
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="mt-4 flex gap-2">

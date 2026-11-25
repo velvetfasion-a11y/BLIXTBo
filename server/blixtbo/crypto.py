@@ -26,7 +26,33 @@ def unwrap_dek(nonce: bytes, token: bytes) -> bytes:
     return AESGCM(settings.kek_bytes()).decrypt(nonce, token, b"blixtbo-dek")
 
 
+BANKID_FIELDS = frozenset(
+    {
+        "personalnumber",
+        "personnummer",
+        "autostarttoken",
+        "orderref",
+        "signature",
+        "bankid",
+        "completiondata",
+        "xmlsig",
+        "ocsp",
+        "refid",
+    }
+)
+
+
+def reject_bankid_material(payload: dict) -> None:
+    keys = {str(key).lower() for key in payload}
+    if keys & BANKID_FIELDS or any("bankid" in key for key in keys):
+        raise ValueError("BankID material is never stored")
+
+
 def encrypt_secret(dek: bytes, payload: dict) -> tuple[bytes, bytes]:
+    reject_bankid_material(payload)
+    keys = {str(key).lower() for key in payload}
+    if "cookie" in keys and keys != {"cookie"}:
+        raise ValueError("a landlord session is stored as the cookie only")
     nonce = os.urandom(12)
     raw = json.dumps(payload, separators=(",", ":")).encode()
     token = AESGCM(dek).encrypt(nonce, raw, b"blixtbo-login")
