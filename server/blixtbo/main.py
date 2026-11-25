@@ -14,7 +14,7 @@ from blixtbo import landlords
 from blixtbo.config import settings
 from blixtbo.db import init_db, session
 from blixtbo.jobs import accept_approval, session_cookie_from_body
-from blixtbo.billing import entitlement_from_event, firebase_uid_from_event, subscription_data
+from blixtbo.billing import client_secret_from_subscription, entitlement_from_event, firebase_uid_from_event, price_lookup_key, price_ore
 from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
 from blixtbo.models import AuditLog, Job, LandlordLogin, Notice, User
@@ -158,38 +158,89 @@ def _stripe():
     return stripe
 
 
-@app.post("/billing/checkout")
-def billing_checkout(request: Request, db: Session = Depends(get_db)) -> dict:
+def _customer_for(stripe, user: User):
+    found = stripe.Customer.search(query=f"metadata['firebaseUid']:'{user.firebase_uid}'", limit=1)
+    if found.data:
+        return found.data[0]
+    return stripe.Customer.create(email=user.email or None, metadata={"firebaseUid": user.firebase_uid})
+
+
+def _ensure_price(stripe) -> str:
+    if settings.stripe_price_id:
+        return settings.stripe_price_id
+    key = price_lookup_key()
+    existing = stripe.Price.list(lookup_keys=[key], active=True, limit=1)
+    if existing.data:
+        return existing.data[0].id
+    product = stripe.Product.create(name="Blixtbo Premium")
+    price = stripe.Price.create(
+        product=product.id,
+        unit_amount=price_ore(),
+        currency="sek",
+        recurring={"interval": "month"},
+        lookup_key=key,
+    )
+    return price.id
+
+
+@app.post("/billing/subscribe")
+def billing_subscribe(request: Request, db: Session = Depends(get_db)) -> dict:
     user = user_from_firebase(request, db)
     if user is None or not user.firebase_uid:
         raise HTTPException(status_code=401, detail="Logga in med Google först.")
     stripe = _stripe()
-    if not settings.stripe_price_id:
-        raise HTTPException(status_code=503, detail="STRIPE_PRICE_ID saknas.")
-    params = {
-        "mode": "subscription",
-        "client_reference_id": user.firebase_uid,
-        "line_items": [{"price": settings.stripe_price_id, "quantity": 1}],
-        "success_url": settings.public_app_url + "/profil?checkout=success",
-        "cancel_url": settings.public_app_url + "/profil?checkout=cancel",
-        "metadata": {"firebaseUid": user.firebase_uid},
-        "subscription_data": subscription_data(user.firebase_uid),
-    }
-    session = stripe.checkout.Session.create(**params)
-    return {"url": session.url}
+    customer = _customer_for(stripe, user)
+    existing = _reusable_subscription(stripe, customer.id)
+    if existing is not None:
+        subscription = existing
+    else:
+        price_id = _ensure_price(stripe)
+        subscription = stripe.Subscription.create(
+            customer=customer.id,
+            items=[{"price": price_id}],
+            trial_period_days=settings.trial_days,
+            payment_behavior="default_incomplete",
+            payment_settings={"save_default_payment_method": "on_subscription"},
+            metadata={"firebaseUid": user.firebase_uid},
+            expand=["pending_setup_intent", "latest_invoice.payment_intent"],
+        )
+    raw = subscription.to_dict() if hasattr(subscription, "to_dict") else subscription
+    try:
+        secret, intent_type = client_secret_from_subscription(raw)
+    except ValueError:
+        raise HTTPException(status_code=502, detail="Stripe gav ingen client_secret.")
+    return {"clientSecret": secret, "intentType": intent_type, "subscriptionId": raw.get("id")}
 
 
-@app.post("/billing/portal")
-def billing_portal(request: Request, db: Session = Depends(get_db)) -> dict:
+@app.get("/billing/entitlement")
+def billing_entitlement(request: Request, db: Session = Depends(get_db)) -> dict:
     user = user_from_firebase(request, db)
     if user is None or not user.firebase_uid:
         raise HTTPException(status_code=401, detail="Logga in med Google först.")
-    stripe = _stripe()
-    customers = stripe.Customer.search(query=f"metadata['firebaseUid']:'{user.firebase_uid}'")
-    if not customers.data:
-        raise HTTPException(status_code=404, detail="Ingen Stripe-kund ännu.")
-    portal = stripe.billing_portal.Session.create(customer=customers.data[0].id, return_url=settings.public_app_url + "/profil")
-    return {"url": portal.url}
+    if settings.data_backend == "firestore":
+        from blixtbo.firebase_app import firestore_client
+
+        snap = firestore_client().collection("users").document(user.firebase_uid).collection("billing").document("entitlement").get()
+        if snap.exists:
+            return snap.to_dict() or {"plan": "free", "status": "free"}
+    return {"plan": "free", "status": "free", "autoApply": False}
+
+
+def _reusable_subscription(stripe, customer_id: str):
+    listed = stripe.Subscription.list(customer=customer_id, status="all", limit=10)
+    for item in listed.data:
+        status = str(getattr(item, "status", "") or item.get("status") or "")
+        if status not in ("incomplete", "trialing", "active", "paused"):
+            continue
+        full = stripe.Subscription.retrieve(
+            item.id,
+            expand=["pending_setup_intent", "latest_invoice.payment_intent"],
+        )
+        raw = full.to_dict() if hasattr(full, "to_dict") else full
+        if raw.get("pending_setup_intent") or status == "incomplete":
+            return raw
+        raise HTTPException(status_code=409, detail="Du har redan Premium.")
+    return None
 
 
 def _subscription_for(user: User):
@@ -227,6 +278,19 @@ def billing_resume(request: Request, db: Session = Depends(get_db)) -> dict:
     entitlement = entitlement_from_event({"type": "customer.subscription.updated", "data": {"object": raw}})
     _write_entitlement(user.firebase_uid, entitlement or {})
     return {"status": "active"}
+
+
+@app.post("/billing/cancel")
+def billing_cancel(request: Request, db: Session = Depends(get_db)) -> dict:
+    user = user_from_firebase(request, db)
+    if user is None or not user.firebase_uid:
+        raise HTTPException(status_code=401, detail="Logga in med Google först.")
+    stripe, subscription = _subscription_for(user)
+    deleted = stripe.Subscription.cancel(subscription.id)
+    raw = deleted.to_dict() if hasattr(deleted, "to_dict") else deleted
+    entitlement = entitlement_from_event({"type": "customer.subscription.deleted", "data": {"object": raw}})
+    _write_entitlement(user.firebase_uid, entitlement or {})
+    return {"status": "canceled"}
 
 
 @app.post("/billing/webhook")

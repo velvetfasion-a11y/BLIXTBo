@@ -1,6 +1,6 @@
 """Stripe subscription entitlement. The monthly price and the trial length come from the environment.
 
-Checkout uses one recurring Price in SEK. The free trial is trial_period_days on that checkout, not a second price and not a coupon.
+The app confirms a SetupIntent or PaymentIntent inside its own sheet. The trial is trial_period_days on the subscription, not a second price and not a coupon.
 """
 
 from blixtbo.config import settings
@@ -10,11 +10,28 @@ def price_ore() -> int:
     return int(round(settings.premium_price_kr * 100))
 
 
+def price_lookup_key() -> str:
+    return f"blixtbo_premium_monthly_{int(settings.premium_price_kr)}_sek"
+
+
 def subscription_data(firebase_uid: str) -> dict:
     return {
         "trial_period_days": settings.trial_days,
         "metadata": {"firebaseUid": firebase_uid},
     }
+
+
+def client_secret_from_subscription(subscription: dict) -> tuple[str, str]:
+    """Trial checkouts confirm a SetupIntent. A charge confirms the invoice PaymentIntent."""
+    setup = subscription.get("pending_setup_intent")
+    if isinstance(setup, dict) and setup.get("client_secret"):
+        return str(setup["client_secret"]), "setup"
+    invoice = subscription.get("latest_invoice") or {}
+    if isinstance(invoice, dict):
+        intent = invoice.get("payment_intent")
+        if isinstance(intent, dict) and intent.get("client_secret"):
+            return str(intent["client_secret"]), "payment"
+    raise ValueError("no client secret")
 
 
 def can_auto_apply(plan: str, status: str, used: int, free_limit: int | None = None) -> bool:
@@ -47,6 +64,8 @@ def entitlement_from_subscription(subscription: dict) -> dict:
 def entitlement_from_event(event: dict) -> dict | None:
     kind = event.get("type")
     data = (event.get("data") or {}).get("object") or {}
+    if kind in ("customer.subscription.created", "customer.subscription.updated"):
+        return entitlement_from_subscription(data)
     if kind == "checkout.session.completed":
         subscription = data.get("subscription")
         if isinstance(subscription, dict):

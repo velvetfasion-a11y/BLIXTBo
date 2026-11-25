@@ -28,15 +28,14 @@ Så pratar de: webbläsaren skriver användarens egna dokument med Firebase-klie
 
 ## Stripe (testläge)
 
-Premium kostar **99 kr/mån** efter **3 dagars** gratis provperiod. Beloppet och längden styrs av `PREMIUM_PRICE_KR` och `TRIAL_DAYS`. Provperioden sätts på utcheckningen (`trial_period_days`), inte som en egen rabattkod. Det finns ingen 149-kronorsnivå.
+Premium kostar **99 kr/mån** efter **3 dagars** gratis provperiod. Beloppet och längden styrs av `PREMIUM_PRICE_KR` och `TRIAL_DAYS`. Provperioden sätts med `trial_period_days` på prenumerationen. Det finns ingen 149-kronorsnivå och ingen rabattkod.
 
 1. Skapa ett konto på [Stripe](https://dashboard.stripe.com/register) och stanna i **testläge** (reglaget Test mode). Använd aldrig en live-nyckel.
 2. **Developers → API keys**. Kopiera den hemliga testnyckeln (`sk_test_...`) till `STRIPE_SECRET_KEY` i `server/.env`, och den publika (`pk_test_...`) till `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` i `.env.local`.
-3. Skapa priset: `cd server && python3 scripts/stripe_setup.py`. Det skriver ut `STRIPE_PRICE_ID`. Lägg det i `server/.env`. Skriptet skapar en produkt och ett månadspris på 99 kr. Det drar inga pengar.
-4. **Developers → Webhooks → Add endpoint**. Adress: `https://din-api/billing/webhook`. Händelser: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`. Kopiera signeringshemligheten (`whsec_...`) till `STRIPE_WEBHOOK_SECRET`.
-5. **Settings → Billing → Customer portal**. Aktivera portalen så att en kund kan se sin prenumeration. Paus görs från appen med `pause_collection`, inte från portalen.
+3. Priset skapas av API:t första gången någon startar en prenumeration, med lookup key `blixtbo_premium_monthly_99_sek`. Du kan också köra `cd server && python3 scripts/stripe_setup.py`. Bara `sk_test_` accepteras.
+4. **Developers → Webhooks → Add endpoint**. Adress: `https://blixtbo.se/api/billing/webhook`. Händelser: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Kopiera `whsec_...` till `STRIPE_WEBHOOK_SECRET`.
 
-Utcheckningen skickar användaren till Stripe Checkout. Webhooken skriver rättigheten till `users/{uid}/billing/entitlement`. Bara servern får skriva det dokumentet. Under provperioden och som betalande Premium går automatiska ansökningar utan tak. En paus stänger av dem tills prenumerationen återupptas.
+Kortet, Apple Pay och Google Pay visas i appens eget ark. Ingen omdirigering till Stripe Checkout. Provperioden är `trial_period_days`. Webhooken skriver `users/{uid}/billing/entitlement`. Paus och avslut är knappar i appen.
 
 ## Emulatorer
 

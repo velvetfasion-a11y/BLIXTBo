@@ -1,4 +1,4 @@
-from blixtbo.billing import can_auto_apply, entitlement_from_event, entitlement_from_subscription, price_ore, subscription_data
+from blixtbo.billing import can_auto_apply, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, price_lookup_key, price_ore, subscription_data
 from blixtbo.config import settings
 
 
@@ -6,9 +6,14 @@ def test_price_is_99_sek_and_trial_is_three_days():
     settings.premium_price_kr = 99
     settings.trial_days = 3
     assert price_ore() == 9900
+    assert price_lookup_key() == "blixtbo_premium_monthly_99_sek"
     data = subscription_data("uid-1")
     assert data["trial_period_days"] == 3
     assert data["metadata"]["firebaseUid"] == "uid-1"
+    secret, kind = client_secret_from_subscription({"pending_setup_intent": {"client_secret": "seti_secret"}})
+    assert secret == "seti_secret" and kind == "setup"
+    secret, kind = client_secret_from_subscription({"latest_invoice": {"payment_intent": {"client_secret": "pi_secret"}}})
+    assert secret == "pi_secret" and kind == "payment"
 
 
 def test_free_limit_premium_trial_and_pause():
@@ -35,6 +40,12 @@ def test_webhook_events_map_to_entitlement():
     })
     assert deleted["plan"] == "free"
     assert deleted["status"] == "canceled"
+    created = entitlement_from_event({
+        "type": "customer.subscription.created",
+        "data": {"object": {"id": "sub_1", "customer": "cus_1", "status": "trialing", "metadata": {"firebaseUid": "uid-1"}}},
+    })
+    assert created["plan"] == "premium"
+    assert created["trial"] is True
     started = entitlement_from_event({
         "type": "checkout.session.completed",
         "data": {"object": {"customer": "cus_1", "subscription": "sub_1", "client_reference_id": "uid-1"}},

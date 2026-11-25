@@ -8,7 +8,7 @@ import { useStore } from "@/lib/store";
 export function SubscriptionCard({ preview = false }: { preview?: boolean }) {
   const store = useStore();
   const billing = preview ? { plan: "premium" as const, status: "active" as const, usedAutoApplies: store.billing.usedAutoApplies } : store.billing;
-  const { error, pause, resume } = useBillingActions();
+  const { error, pause, resume, cancel } = useBillingActions();
   const [paywall, setPaywall] = useState(false);
   const paused = billing.status === "paused";
   const premium = billing.plan === "premium" && billing.status === "active";
@@ -20,9 +20,14 @@ export function SubscriptionCard({ preview = false }: { preview?: boolean }) {
       {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
       <div className="mt-4 flex flex-col gap-2">
         {premium || preview ? (
-          <Button variant="outline" onClick={() => void pause()}>
-            Pausa – jag har hittat bostad
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => void pause()}>
+              Pausa – jag har hittat bostad
+            </Button>
+            <Button variant="ghost" onClick={() => void cancel()}>
+              Avsluta prenumerationen
+            </Button>
+          </>
         ) : null}
         {paused ? (
           <Button onClick={() => void resume()}>Återuppta Premium</Button>
