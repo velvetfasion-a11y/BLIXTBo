@@ -22,6 +22,17 @@ def _store_secret(user: User, login: LandlordLogin, payload: dict) -> None:
     nonce, token = crypto.encrypt_secret(dek, payload)
     login.secret_nonce = nonce
     login.secret_ciphertext = token
+    from blixtbo.credentials import mirror_credential
+
+    mirror_credential(
+        getattr(user, "firebase_uid", None),
+        login.source_id,
+        nonce,
+        token,
+        login.username,
+        login.landlord_requires_bankid,
+        login.status,
+    )
 
 
 def _mark_needs_user(db, login: LandlordLogin, error: str) -> None:

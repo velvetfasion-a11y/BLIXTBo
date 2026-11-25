@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { Boot } from "@/components/boot";
 import { IconChevron, IconLock } from "@/components/icons";
 import { Button, Field } from "@/components/ui";
+import { signInWithGoogle, signOutGoogle } from "@/lib/firebase/auth";
+import { firebaseConfigured } from "@/lib/firebase/client";
 import { useStore } from "@/lib/store";
 import type { User } from "@/lib/types";
 
@@ -46,9 +48,34 @@ export function Account() {
     router.push("/guide");
   }
 
-  function continueProvider(provider: Provider) {
+  async function continueProvider(provider: Provider) {
     setError("");
     setOpening(provider);
+    if (provider === "google" && firebaseConfigured()) {
+      try {
+        const result = await signInWithGoogle();
+        const accountEmail = result.user.email || email;
+        const accountName = result.user.displayName || name;
+        finish("google", accountEmail, accountName);
+        await store.attachGoogle(result.user.uid);
+        const token = await result.user.getIdToken();
+        const api = process.env.NEXT_PUBLIC_API_URL;
+        if (api) {
+          await fetch(`${api.replace(/\/$/, "")}/auth/firebase`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ idToken: token }),
+          }).catch(() => undefined);
+        }
+        router.push("/guide");
+      } catch (caught) {
+        console.error(caught);
+        setError("Google-inloggningen avbröts. Försök igen.");
+        setOpening(null);
+        await signOutGoogle().catch(() => undefined);
+      }
+      return;
+    }
     window.setTimeout(() => {
       const accountEmail = email.includes("@") ? email : provider === "google" ? "du@gmail.com" : "du@icloud.com";
       finish(provider, accountEmail, name);

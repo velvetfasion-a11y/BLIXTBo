@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function noBankId(data) {
+      return !data.keys().hasAny([
+        'personalNumber',
+        'personnummer',
+        'autoStartToken',
+        'orderRef',
+        'bankid',
+        'signature',
+        'completionData',
+        'xmlsig'
+      ]);
+    }
+
+    match /users/{uid} {
+      allow read: if signedInAs(uid);
+      allow create, update: if signedInAs(uid) && noBankId(request.resource.data);
+      allow delete: if signedInAs(uid);
+
+      match /swipes/{swipeId} {
+        allow read: if signedInAs(uid);
+        allow create, update: if signedInAs(uid) && noBankId(request.resource.data);
+        allow delete: if signedInAs(uid);
+      }
+
+      match /applications/{applicationId} {
+        allow read: if signedInAs(uid);
+        allow create, update: if signedInAs(uid) && noBankId(request.resource.data);
+        allow delete: if signedInAs(uid);
+      }
+
+      match /offers/{offerId} {
+        allow read: if signedInAs(uid);
+        allow create, update: if signedInAs(uid) && noBankId(request.resource.data);
+        allow delete: if signedInAs(uid);
+      }
+
+      match /queues/{queueId} {
+        allow read: if signedInAs(uid);
+        allow create, update: if signedInAs(uid) && noBankId(request.resource.data);
+        allow delete: if signedInAs(uid);
+      }
+    }
+
+    // Landlord passwords and session cookies. Admin SDK only.
+    match /credentials/{uid}/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Limits and other owner settings. Clients may read the numbers; only the server writes.
+    match /config/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

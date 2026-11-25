@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     hf_token: str = ""
     match_backend: str = "hf-inference"
     landlord_mode: str = "dry-run"
+    data_backend: str = "postgres"
+    firebase_project_id: str = ""
+    firebase_service_account: str = ""
 
     def kek_bytes(self) -> bytes:
         if not self.worker_kek:

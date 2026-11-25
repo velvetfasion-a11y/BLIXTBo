@@ -2,7 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, useState } from "react";
 import { createDemo, createFreshUser, createLoggedOut, queueForSource, segmentMatches, welcomeNotice } from "@/lib/data";
-import { activeForSource, applicationLimit, atApplicationLimit, isActiveApplication } from "@/lib/limits";
+import { signOutGoogle } from "@/lib/firebase/auth";
+import { pushState, type CloudState } from "@/lib/firebase/repository";
+import { cloudUid, setCloudSession } from "@/lib/firebase/session";
+import { hydrateCloud, scheduleCloudSync, watchAuth } from "@/lib/firebase/sync";
+import { applicationLimit, atApplicationLimit, isActiveApplication } from "@/lib/limits";
 import { completeness, queueAlert } from "@/lib/profile";
 import type { AppStatus, Connection, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, Source, User } from "@/lib/types";
 
@@ -76,6 +80,7 @@ function commit(next: Persisted) {
     cache = { raw: localStorage.getItem(KEY) ?? "", value: next };
   }
   window.dispatchEvent(new Event("blixtbo-change"));
+  scheduleCloudSync(next);
 }
 
 type Undo =
@@ -91,6 +96,7 @@ type Store = Persisted & {
   undo: () => void;
   signInDemo: () => void;
   signIn: (input: { name: string; email: string; method: User["method"] }) => void;
+  attachGoogle: (uid: string) => Promise<void>;
   logout: () => void;
   reset: () => void;
   updateProfile: (patch: Partial<Profile>) => void;
@@ -126,6 +132,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [undo, setUndo] = useState<Undo>(null);
 
   useEffect(() => {
+    return watchAuth((uid) => {
+      const state = latest();
+      if (!state?.user || state.user.demo) return;
+      void pushState(uid, state);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => {
       setToast(null);
@@ -135,6 +149,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [toast]);
 
   const signInDemo = useCallback(() => {
+    setCloudSession(null);
+    void signOutGoogle();
     commit(createDemo());
     setToast("Exempelkonto öppnat");
     setUndo(null);
@@ -142,6 +158,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(
     (input: { name: string; email: string; method: User["method"] }) => {
+      if (input.method !== "google") setCloudSession(null);
       const current = latest() ?? createLoggedOut();
       const user = createFreshUser(input);
       commit({
@@ -161,7 +178,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const attachGoogle = useCallback(async (uid: string) => {
+    await hydrateCloud(uid, (remote: CloudState) => {
+      const current = latest() ?? createLoggedOut();
+      const sources = current.sources.map((source) => {
+        const limit = remote.limits[source.id];
+        return limit ? { ...source, ...limit } : source;
+      });
+      commit({
+        ...current,
+        user: remote.user?.profile ? remote.user : current.user,
+        filters: remote.filters ?? current.filters,
+        prefs: remote.prefs ?? current.prefs,
+        waiting: remote.waiting ?? [],
+        applications: remote.applications ?? [],
+        queues: remote.queues ?? [],
+        dismissed: remote.dismissed ?? [],
+        sources,
+      });
+    });
+    const uidNow = cloudUid();
+    const state = latest();
+    if (uidNow && state) await pushState(uidNow, state);
+  }, []);
+
   const logout = useCallback(() => {
+    setCloudSession(null);
+    void signOutGoogle();
     const current = latest() ?? createLoggedOut();
     const fresh = createLoggedOut();
     commit({
@@ -176,6 +219,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const reset = useCallback(() => {
+    setCloudSession(null);
     commit(createLoggedOut());
     setToast("Prototypen är återställd");
     setUndo(null);
@@ -647,6 +691,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       undo: undoAction,
       signInDemo,
       signIn,
+      attachGoogle,
       logout,
       reset,
       updateProfile,
@@ -680,6 +725,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     undoAction,
     signInDemo,
     signIn,
+    attachGoogle,
     logout,
     reset,
     updateProfile,

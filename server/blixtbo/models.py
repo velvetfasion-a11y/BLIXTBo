@@ -18,6 +18,7 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     google_sub: Mapped[str | None] = mapped_column(String(128), unique=True)
+    firebase_uid: Mapped[str | None] = mapped_column(String(128), unique=True)
     email: Mapped[str] = mapped_column(String(320), unique=True)
     name: Mapped[str] = mapped_column(String(200), default="")
     auth_method: Mapped[str] = mapped_column(String(20))
