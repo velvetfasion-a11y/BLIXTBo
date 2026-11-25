@@ -1,7 +1,7 @@
 import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { defaultFilters } from "@/lib/data";
 import { firebaseConfigured, firebaseDb } from "@/lib/firebase/client";
-import type { Application, Persisted, Profile, Queue, WaitingSpot } from "@/lib/types";
+import type { Application, CustomLandlord, Persisted, Profile, Queue, WaitingSpot } from "@/lib/types";
 
 const OFFER = new Set(["erbjuden", "accepterad", "avbojd", "kontrakt"]);
 
@@ -13,6 +13,7 @@ export type CloudState = {
   applications: Application[];
   queues: Queue[];
   dismissed: string[];
+  customLandlords: CustomLandlord[];
   limits: Record<string, { applicationLimit: number | null; plusLimit: number | null; plusPriceKr: number | null; plusUrl: string }>;
 };
 
@@ -57,6 +58,9 @@ export async function pushState(uid: string, state: Persisted) {
   for (const queue of state.queues) {
     await setDoc(doc(db, "users", uid, "queues", queue.id), plain(queue));
   }
+  for (const landlord of state.customLandlords ?? []) {
+    await setDoc(doc(db, "users", uid, "customLandlords", landlord.id), plain(landlord));
+  }
 }
 
 export async function pullState(uid: string): Promise<CloudState | null> {
@@ -68,6 +72,7 @@ export async function pullState(uid: string): Promise<CloudState | null> {
   const applications = (await getDocs(collection(db, "users", uid, "applications"))).docs.map((item) => item.data() as Application);
   const queues = (await getDocs(collection(db, "users", uid, "queues"))).docs.map((item) => item.data() as Queue);
   const swipes = (await getDocs(collection(db, "users", uid, "swipes"))).docs.map((item) => item.data() as { direction?: string; listingId?: string });
+  const customLandlords = (await getDocs(collection(db, "users", uid, "customLandlords"))).docs.map((item) => item.data() as CustomLandlord);
   const limitsSnap = await getDocs(collection(db, "config", "landlords", "sources")).catch(() => null);
   const limits: CloudState["limits"] = {};
   limitsSnap?.forEach((item) => {
@@ -96,6 +101,7 @@ export async function pullState(uid: string): Promise<CloudState | null> {
     applications,
     queues,
     dismissed: swipes.filter((item) => item.direction === "no" && item.listingId).map((item) => String(item.listingId)),
+    customLandlords,
     limits,
   };
 }

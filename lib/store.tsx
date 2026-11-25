@@ -8,7 +8,7 @@ import { cloudUid, setCloudSession } from "@/lib/firebase/session";
 import { hydrateCloud, scheduleCloudSync, watchAuth } from "@/lib/firebase/sync";
 import { applicationLimit, atApplicationLimit, isActiveApplication } from "@/lib/limits";
 import { completeness, queueAlert } from "@/lib/profile";
-import type { AppStatus, Connection, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, Source, User } from "@/lib/types";
+import type { AppStatus, Connection, CustomLandlord, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, Source, User } from "@/lib/types";
 
 const KEY = "blixtbo-v1";
 const SERVER_STATE = createLoggedOut(0);
@@ -35,7 +35,7 @@ function getSnapshot(): Persisted {
   try {
     const parsed = JSON.parse(raw) as Persisted;
     if (parsed.version !== 1 || !Array.isArray(parsed.listings)) throw new Error("bad");
-    const value = { ...parsed, waiting: parsed.waiting ?? [] };
+    const value = { ...parsed, waiting: parsed.waiting ?? [], customLandlords: parsed.customLandlords ?? [] };
     cache = { raw, value };
     return value;
   } catch {
@@ -119,6 +119,9 @@ type Store = Persisted & {
   toggleListing: (id: string) => void;
   addListing: (listing: Listing) => void;
   toggleSource: (id: string) => void;
+  saveCustomLandlord: (input: Omit<CustomLandlord, "id" | "createdAt" | "confirmed" | "applyMode"> & { id?: string }) => string;
+  removeCustomLandlord: (id: string) => void;
+  confirmCustomLandlord: (id: string, websiteUrl: string, applyMode: CustomLandlord["applyMode"], listings: Listing[]) => void;
   sendPush: (input: { title: string; body: string; segment: string }) => number;
   answerOffer: (applicationId: string, accept: boolean) => void;
   signContract: (applicationId: string) => void;
@@ -194,6 +197,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         applications: remote.applications ?? [],
         queues: remote.queues ?? [],
         dismissed: remote.dismissed ?? [],
+        customLandlords: remote.customLandlords ?? current.customLandlords,
         sources,
       });
     });
@@ -535,6 +539,68 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setUndo(null);
   }, []);
 
+  const saveCustomLandlord = useCallback((input: Omit<CustomLandlord, "id" | "createdAt" | "confirmed" | "applyMode"> & { id?: string }) => {
+    const current = latest();
+    if (!current) return "";
+    const id = input.id || `custom-${Date.now()}`;
+    const existing = current.customLandlords.find((item) => item.id === id);
+    const next: CustomLandlord = {
+      id,
+      name: input.name.trim(),
+      websiteUrl: input.websiteUrl.trim(),
+      country: input.country.trim(),
+      city: input.city.trim(),
+      kind: input.kind,
+      confirmed: existing?.confirmed ?? false,
+      applyMode: existing?.applyMode ?? "manual",
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+    };
+    const customLandlords = existing
+      ? current.customLandlords.map((item) => (item.id === id ? next : item))
+      : [next, ...current.customLandlords];
+    commit({ ...current, customLandlords });
+    return id;
+  }, []);
+
+  const removeCustomLandlord = useCallback((id: string) => {
+    const current = latest();
+    if (!current) return;
+    commit({
+      ...current,
+      customLandlords: current.customLandlords.filter((item) => item.id !== id),
+      sources: current.sources.filter((item) => item.id !== id),
+      listings: current.listings.filter((item) => item.sourceId !== id),
+    });
+  }, []);
+
+  const confirmCustomLandlord = useCallback((id: string, websiteUrl: string, applyMode: CustomLandlord["applyMode"], listings: Listing[]) => {
+    const current = latest();
+    if (!current) return;
+    const landlord = current.customLandlords.find((item) => item.id === id);
+    if (!landlord) return;
+    const source: Source = {
+      id,
+      name: landlord.name,
+      kind: landlord.kind === "byggbolag" ? "Byggbolag" : landlord.kind === "annat" ? "Annat" : "Hyresvärd",
+      blurb: [landlord.city, landlord.country].filter(Boolean).join(", ") || "Egen källa",
+      syncMin: 60,
+      health: "ok",
+      enabled: true,
+      requiresBankId: false,
+    };
+    const known = new Set(current.listings.map((item) => item.id));
+    const fresh = listings.filter((item) => !known.has(item.id));
+    commit({
+      ...current,
+      customLandlords: current.customLandlords.map((item) =>
+        item.id === id ? { ...item, websiteUrl, confirmed: true, applyMode } : item,
+      ),
+      sources: [source, ...current.sources.filter((item) => item.id !== id)],
+      listings: [...fresh, ...current.listings],
+    });
+    setToast(fresh.length === 1 ? `En bostad från ${landlord.name}` : fresh.length ? `${fresh.length} bostäder från ${landlord.name}` : `${landlord.name} är tillagd`);
+  }, []);
+
   const toggleSource = useCallback((id: string) => {
     const current = latest();
     if (!current) return;
@@ -714,6 +780,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleListing,
       addListing,
       toggleSource,
+      saveCustomLandlord,
+      removeCustomLandlord,
+      confirmCustomLandlord,
       sendPush,
       answerOffer,
       signContract,
@@ -748,6 +817,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     toggleListing,
     addListing,
     toggleSource,
+    saveCustomLandlord,
+    removeCustomLandlord,
+    confirmCustomLandlord,
     sendPush,
     answerOffer,
     signContract,

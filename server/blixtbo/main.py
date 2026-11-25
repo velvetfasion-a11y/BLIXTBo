@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 import httpx
 import pyotp
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy.orm import Session
@@ -13,11 +14,18 @@ from blixtbo import landlords
 from blixtbo.config import settings
 from blixtbo.db import init_db, session
 from blixtbo.jobs import accept_approval, session_cookie_from_body
+from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
 from blixtbo.models import AuditLog, Job, LandlordLogin, Notice, User
 from blixtbo.crypto import public_connection
 
 app = FastAPI(title="Blixtbo", docs_url=None, redoc_url=None)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:43123", "http://localhost:43123"],
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["*"],
+)
 serializer = URLSafeTimedSerializer(settings.app_secret, salt="blixtbo-session")
 oauth_states: dict[str, str] = {}
 
@@ -130,6 +138,38 @@ def startup() -> None:
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
+
+
+@app.post("/custom-landlords/discover")
+def discover_landlord(body: dict) -> dict:
+    name = str(body.get("name") or "").strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Skriv ett namn.")
+    city = str(body.get("city") or "").strip()
+    kind = str(body.get("kind") or "").strip()
+    website = str(body.get("websiteUrl") or "").strip()
+    if website:
+        candidates = [{"url": website, "title": name, "snippet": "Adress som du skrev in"}]
+    else:
+        candidates = search_web(name, city, kind)
+    ranked = rank_candidates(name, city, kind, candidates)
+    return {"candidates": ranked[:5]}
+
+
+@app.post("/custom-landlords/listings")
+def custom_listings(body: dict) -> dict:
+    url = str(body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="En adress saknas.")
+    found, error = fetch_listings(url)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    filters = body.get("filters") or {}
+    kept = [item for item in found if keep_listing(item, filters)]
+    profile = body.get("profile") or {}
+    profile_text = " ".join(str(profile.get(key) or "") for key in ("occupation", "letter", "currentCity", "city"))
+    mode = apply_mode(url)
+    return {"applyMode": mode, "listings": rank_listings(profile_text, kept)}
 
 
 @app.post("/auth/firebase")

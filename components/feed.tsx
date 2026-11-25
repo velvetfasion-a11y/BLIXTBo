@@ -88,6 +88,7 @@ export function Feed() {
                 onSkip={(id) => store.skip(id)}
                 onYes={(listing) => {
                   const connected = store.connections[listing.sourceId]?.status === "connected";
+                  if (listing.manualApply) return false;
                   if (!connected) {
                     setPendingApply(listing.id);
                     setGate(listing.sourceId);
@@ -286,7 +287,7 @@ function Deck({
             {rokShort(top.rooms)} · {top.sqm} m² · {top.features.slice(0, 2).join(" · ") || "Förstahand"}
           </p>
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium">{sourceName(top.sourceId)}</span>
+            <span className="font-medium">{top.sourceName || sourceName(top.sourceId)}</span>
             <span className={top.deadlineAt ? "text-clay" : "text-soft"}>{deadlineLabel(top.deadlineAt)}</span>
           </div>
           <MatchBlock listing={top} />
@@ -297,9 +298,15 @@ function Deck({
             <Link href={`/bostad?id=${top.id}`} className="text-sm text-soft">
               Mer om bostaden
             </Link>
-            <button type="button" className="grid h-14 w-14 place-items-center rounded-full bg-pine text-sm font-medium text-white" onClick={() => commit("yes")} aria-label="Ja, ansök">
-              Ja
-            </button>
+            {top.manualApply ? (
+              <a href={top.applyUrl} target="_blank" rel="noreferrer" className="inline-flex h-14 items-center rounded-full border border-line px-4 text-sm font-medium">
+                Ansök själv
+              </a>
+            ) : (
+              <button type="button" className="grid h-14 w-14 place-items-center rounded-full bg-pine text-sm font-medium text-white" onClick={() => commit("yes")} aria-label="Ja, ansök">
+                Ja
+              </button>
+            )}
           </div>
         </div>
       </article>
@@ -319,7 +326,7 @@ function MatchBlock({ listing }: { listing: Listing }) {
           {line.text}
         </p>
       ))}
-      {!connected ? <p className="text-soft">Koppla {sourceName(listing.sourceId)} för att ansöka.</p> : null}
+      {!connected && !listing.manualApply ? <p className="text-soft">Koppla {listing.sourceName || sourceName(listing.sourceId)} för att ansöka.</p> : null}
     </div>
   );
 }
@@ -334,7 +341,7 @@ export function DetailPanel({ listing }: { listing: Listing }) {
       <img src={asset(listing.photos[0])} alt="" className="h-64 w-full object-cover" />
       <div className="space-y-4 p-6">
         <div>
-          <p className="text-sm text-soft">{freshness(listing.publishedAt)} · {source?.name}</p>
+          <p className="text-sm text-soft">{freshness(listing.publishedAt)} · {listing.sourceName || source?.name}</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">{listing.address}</h2>
           <p className="text-soft">{listing.area}, {listing.city}</p>
         </div>
