@@ -25,7 +25,7 @@ from blixtbo.account import (
     run_deletion,
     valid_uid,
 )
-from blixtbo.billing import as_dict, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, firebase_uid_from_event, is_stripe_test_key, price_lookup_key, price_ore, resume_subscription, schedule_cancel, subscription_view
+from blixtbo.billing import as_dict, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, firebase_uid_from_event, is_stripe_secret_key, price_lookup_key, price_ore, resume_subscription, schedule_cancel, subscription_view
 from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
 from blixtbo.models import AuditLog, Job, LandlordLogin, Notice, User
@@ -163,8 +163,8 @@ def _write_entitlement(uid: str, entitlement: dict) -> None:
 def _stripe():
     import stripe
 
-    if not is_stripe_test_key(settings.stripe_secret_key):
-        raise HTTPException(status_code=503, detail="Stripe-testnyckel saknas.")
+    if not is_stripe_secret_key(settings.stripe_secret_key):
+        raise HTTPException(status_code=503, detail="Stripe-nyckeln är ogiltig.")
     stripe.api_key = settings.stripe_secret_key
     return stripe
 

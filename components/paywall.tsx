@@ -3,15 +3,16 @@
 import { useState } from "react";
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
+import Link from "next/link";
 import { Button, Sheet } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { premiumPriceKr, trialDays } from "@/lib/billing";
 import { firebaseAuth, firebaseConfigured } from "@/lib/firebase/client";
+import { usablePublishableKey } from "@/lib/stripe-key";
 import { useStore } from "@/lib/store";
 
 function publishableKey() {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
-  return key.startsWith("pk_test_") ? key : "";
+  return usablePublishableKey(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 }
 
 const stripePromise: Promise<Stripe | null> | null = publishableKey() ? loadStripe(publishableKey()) : null;
@@ -116,7 +117,7 @@ function PaywallBody({ onClose }: { onClose: () => void }) {
   async function prepare() {
     setError("");
     if (!key || !stripePromise) {
-      setError("Kortfältet kräver en pk_test-nyckel. Inga live-nycklar.");
+      setError("Kortfältet kräver en pk_test_- eller pk_live_-nyckel.");
       return;
     }
     if (!firebaseConfigured() || !firebaseAuth().currentUser) {
@@ -159,7 +160,14 @@ function PaywallBody({ onClose }: { onClose: () => void }) {
           <p className="mt-4 font-serif text-4xl tracking-[-0.03em]">
             {days} dagar<span className="text-base text-soft"> gratis</span>
           </p>
-          <p className="mt-1 text-sm text-soft">Sedan {price} kr/mån. Ingen bindningstid. Bara testkort.</p>
+          <p className="mt-1 text-sm text-soft">Sedan {price} kr/mån. Ingen bindningstid.</p>
+          <p className="mt-3 text-sm leading-relaxed text-soft">
+            Genom att starta provperioden godkänner du{" "}
+            <Link href="/villkor" className="font-medium text-ink underline">
+              villkoren
+            </Link>
+            .
+          </p>
           {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
           {secret && stripePromise ? (
             <Elements stripe={stripePromise} options={{ clientSecret: secret, appearance }}>
