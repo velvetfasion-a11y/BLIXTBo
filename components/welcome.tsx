@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Boot } from "@/components/boot";
 import { Wordmark } from "@/components/mark";
 import { SignIn } from "@/components/sign-in";
+import { SiteFooter } from "@/components/site-footer";
 import { asset } from "@/lib/asset";
 import { useStore } from "@/lib/store";
 
@@ -23,10 +24,21 @@ const PROMISES = [
   },
 ];
 
+function noticeText(kind: string) {
+  if (kind === "uppgifter") {
+    return "Uppgifterna om dig är raderade och du är utloggad. Stripe-kunden är anonymiserad. Fakturor och betalunderlag behålls enligt bokföringslagen.";
+  }
+  if (kind === "exempel") {
+    return "Exempelkontot fanns bara i den här webbläsaren och är borttaget. Inget konto i molnet berördes.";
+  }
+  return "Blixtbo-kontot är stängt och du är utloggad. Ansökningar, meddelanden, hyresvärdarnas inloggningar och loggar ligger kvar tills du ber om att alla uppgifter raderas.";
+}
+
 export function Welcome() {
   const store = useStore();
   const router = useRouter();
   const signedInOnArrival = useRef<boolean | null>(null);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     if (!store.ready) return;
@@ -38,12 +50,29 @@ export function Welcome() {
     document.title = "Blixtbo";
   }, []);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const value = sessionStorage.getItem("blixtbo-notice");
+        if (!value) return;
+        sessionStorage.removeItem("blixtbo-notice");
+        setNotice(value);
+      } catch {
+        /* storage blocked */
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   if (!store.ready || store.user) return <Boot />;
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
       <div className="flex flex-col px-6 py-8 sm:px-12 lg:px-16 lg:py-12">
         <Wordmark />
+        {notice ? (
+          <p className="mt-8 max-w-md rounded-2xl bg-pine-soft px-4 py-3 text-sm leading-relaxed text-pine-deep">{noticeText(notice)}</p>
+        ) : null}
         <div className="enter mt-12 max-w-xl lg:mt-auto">
           <h1 className="font-serif text-[2.7rem] leading-[1.02] tracking-[-0.035em] sm:text-6xl">
             Var först
@@ -67,6 +96,7 @@ export function Welcome() {
             </li>
           ))}
         </ul>
+        <SiteFooter flush />
       </div>
       <div className="relative hidden overflow-hidden bg-[#e7e0d4] lg:block">
         <div className="absolute inset-0 grid place-items-center">

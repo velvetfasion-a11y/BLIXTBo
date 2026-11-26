@@ -1,7 +1,10 @@
 """Stripe subscription entitlement. The monthly price and the trial length come from the environment.
 
 The app confirms a SetupIntent or PaymentIntent inside its own sheet. The trial is trial_period_days on the subscription, not a second price and not a coupon.
+Cancelling keeps access until the period ends (cancel_at_period_end). It does not open a Stripe-hosted page.
 """
+
+from datetime import datetime, timezone
 
 from blixtbo.config import settings
 
@@ -49,6 +52,30 @@ def can_auto_apply(plan: str, status: str, used: int, free_limit: int | None = N
     return used < limit
 
 
+def as_dict(value) -> dict:
+    if value is None:
+        return {}
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def period_end_iso(subscription: dict) -> str | None:
+    raw = subscription.get("current_period_end")
+    if raw in (None, ""):
+        items = subscription.get("items") or {}
+        data = items.get("data") if isinstance(items, dict) else None
+        if data:
+            raw = data[0].get("current_period_end")
+    if isinstance(raw, (int, float)) and raw > 0:
+        return datetime.fromtimestamp(int(raw), timezone.utc).isoformat()
+    if isinstance(raw, str) and raw:
+        return raw
+    return None
+
+
 def entitlement_from_subscription(subscription: dict) -> dict:
     status = str(subscription.get("status") or "")
     paused = bool(subscription.get("pause_collection"))
@@ -57,6 +84,8 @@ def entitlement_from_subscription(subscription: dict) -> dict:
     base = {
         "stripeCustomerId": customer if isinstance(customer, str) else (customer or {}).get("id", ""),
         "stripeSubscriptionId": sub_id or "",
+        "cancelAtPeriodEnd": bool(subscription.get("cancel_at_period_end")),
+        "currentPeriodEnd": period_end_iso(subscription),
     }
     if status in ("canceled", "incomplete_expired", "unpaid"):
         return {**base, "plan": "free", "status": "canceled", "autoApply": False}
@@ -65,6 +94,47 @@ def entitlement_from_subscription(subscription: dict) -> dict:
     if status in ("active", "trialing"):
         return {**base, "plan": "premium", "status": "active", "autoApply": True, "trial": status == "trialing"}
     return {**base, "plan": "free", "status": "free", "autoApply": False}
+
+
+def subscription_view(subscription: dict | None) -> dict:
+    """What the app shows. Access stays until currentPeriodEnd when cancel is scheduled."""
+    if not subscription:
+        return {"plan": "free", "status": "free", "cancelAtPeriodEnd": False, "currentPeriodEnd": None, "trial": False}
+    entitlement = entitlement_from_subscription(subscription)
+    return {
+        "plan": entitlement["plan"],
+        "status": entitlement["status"],
+        "cancelAtPeriodEnd": bool(entitlement.get("cancelAtPeriodEnd")),
+        "currentPeriodEnd": entitlement.get("currentPeriodEnd"),
+        "trial": bool(entitlement.get("trial")),
+    }
+
+
+def schedule_cancel(stripe, subscription: dict) -> dict:
+    """Idempotent. A second call does not change a subscription that already ends at period end."""
+    status = str(subscription.get("status") or "")
+    if status in ("canceled", "incomplete_expired"):
+        return subscription
+    if subscription.get("cancel_at_period_end"):
+        return subscription
+    updated = stripe.Subscription.modify(subscription["id"], cancel_at_period_end=True)
+    return as_dict(updated)
+
+
+def resume_subscription(stripe, subscription: dict) -> dict:
+    """Clear a scheduled cancel, a pause, or both. A fully ended subscription is left as it is."""
+    status = str(subscription.get("status") or "")
+    if status in ("canceled", "incomplete_expired"):
+        return subscription
+    params: dict = {}
+    if subscription.get("cancel_at_period_end"):
+        params["cancel_at_period_end"] = False
+    if subscription.get("pause_collection"):
+        params["pause_collection"] = ""
+    if not params:
+        return subscription
+    updated = stripe.Subscription.modify(subscription["id"], **params)
+    return as_dict(updated)
 
 
 def entitlement_from_event(event: dict) -> dict | None:

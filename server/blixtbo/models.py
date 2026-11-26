@@ -26,6 +26,7 @@ class User(Base):
     dek_wrapped: Mapped[bytes | None] = mapped_column(LargeBinary)
     totp_secret: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class LandlordLogin(Base):
@@ -90,3 +91,19 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(80))
     target: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DeletionJournal(Base):
+    """Crash-recovery record for account deletion. No card data. The email is cleared when erasure finishes."""
+
+    __tablename__ = "deletion_journal"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    firebase_uid: Mapped[str] = mapped_column(String(128), index=True)
+    user_id: Mapped[str] = mapped_column(String(36), default="")
+    scope: Mapped[str] = mapped_column(String(20))
+    prior_email: Mapped[str] = mapped_column(String(320), default="")
+    stripe_customer_id: Mapped[str] = mapped_column(String(64), default="")
+    phase: Mapped[str] = mapped_column(String(32), default="started")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
