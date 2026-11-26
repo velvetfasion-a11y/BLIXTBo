@@ -16,9 +16,11 @@ export function QueueNudge() {
   return (
     <>
       <div className="mb-3 shrink-0 rounded-2xl bg-pine-soft px-4 py-3">
-        <p className="text-sm font-medium text-pine-deep">Du hade kommit med i {count} köer i dag</p>
+        <p className="text-sm font-medium text-pine-deep">
+          Du hade kommit med i {count} {count === 1 ? "kö" : "köer"} i dag
+        </p>
         <p className="mt-1 text-sm leading-relaxed text-pine-deep/80">
-          Premium hade ansökt automatiskt på bostäderna som matchade dina filter.
+          Premium hade ansökt automatiskt på {count === 1 ? "bostaden" : "bostäderna"} som matchade dina filter.
         </p>
         <Button size="sm" className="mt-3" onClick={() => setPaywall(true)}>
           Uppgradera

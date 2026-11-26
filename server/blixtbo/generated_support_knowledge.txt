@@ -226,6 +226,8 @@ Logga in med Google så att betalningen stannar i appen.
 Stripe gav ingen client_secret.
 Gick inte att pausa.
 Gick inte att återuppta.
+Missa inte nästa lägenhet
+De bästa lägenheterna försvinner på minuter. Blixtbo ansöker först och håller köerna vid liv.
 
 ## components/confirm-apply.tsx
 Bekräfta och skicka

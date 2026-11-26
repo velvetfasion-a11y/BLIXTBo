@@ -211,8 +211,11 @@ function PaywallBody({ onClose }: { onClose: () => void }) {
             <Mark size={36} />
           </div>
           <h2 id="premium-title" className="mt-4 text-center font-serif text-[1.85rem] leading-[1.15] tracking-[-0.03em]">
-            {price} kr i månaden för att fortsätta
+            Missa inte nästa lägenhet
           </h2>
+          <p className="mt-3 text-center text-sm leading-relaxed text-soft">
+            De bästa lägenheterna försvinner på minuter. Blixtbo ansöker först och håller köerna vid liv.
+          </p>
           <ul className="mt-5 space-y-2.5">
             {BENEFITS.map((point) => (
               <li key={point} className="flex gap-2.5 text-sm leading-5 text-ink">
