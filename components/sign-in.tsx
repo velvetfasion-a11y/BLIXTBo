@@ -5,7 +5,18 @@ import { Roboto } from "next/font/google";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Button, cx, Field } from "@/components/ui";
-import { googleErrorMessage, signInWithGoogle, signOutGoogle, takeGoogleRedirectResult } from "@/lib/firebase/auth";
+import {
+  accountFromProvider,
+  appleErrorMessage,
+  consumeRedirectProvider,
+  googleErrorMessage,
+  providerMethod,
+  rememberProviderName,
+  signInWithApple,
+  signInWithGoogle,
+  signOutGoogle,
+  takeRedirectResult,
+} from "@/lib/firebase/auth";
 import { firebaseConfigured } from "@/lib/firebase/client";
 import { useStore } from "@/lib/store";
 import type { User } from "@/lib/types";
@@ -25,22 +36,21 @@ export function SignIn() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
-  const adoptRef = useRef<(result: UserCredential) => Promise<void>>(async () => undefined);
+  const adoptRef = useRef<(result: UserCredential, method: Provider) => Promise<void>>(async () => undefined);
 
-  async function adoptGoogle(result: UserCredential) {
-    const accountEmail = result.user.email || result.user.providerData.find((item) => item.email)?.email || "";
-    if (!accountEmail.includes("@")) {
-      setError("Google-kontot har ingen e-postadress.");
+  async function adopt(result: UserCredential, method: Provider) {
+    const account = accountFromProvider(result, method);
+    if (!account.email.includes("@")) {
+      setError(method === "apple" ? "Apple-kontot har ingen e-postadress." : "Google-kontot har ingen e-postadress.");
       setOpening(null);
       await signOutGoogle().catch(() => undefined);
       return;
     }
-    const fallback = accountEmail.split("@")[0]?.replace(/[._-]/g, " ").trim() || "Ny användare";
-    store.signIn({
-      name: result.user.displayName?.trim() || fallback,
-      email: accountEmail,
-      method: "google",
-    });
+    const fallback = account.email.split("@")[0]?.replace(/[._-]/g, " ").trim() || "Ny användare";
+    if (method === "apple" && account.name) {
+      await rememberProviderName(result, account.name).catch((caught) => console.error(caught));
+    }
+    store.signIn({ name: account.name || fallback, email: account.email, method });
     try {
       await store.attachGoogle(result.user.uid);
       const token = await result.user.getIdToken();
@@ -59,22 +69,27 @@ export function SignIn() {
   }
 
   useEffect(() => {
-    adoptRef.current = adoptGoogle;
+    adoptRef.current = adopt;
   });
 
   useEffect(() => {
     let active = true;
-    takeGoogleRedirectResult()
+    takeRedirectResult()
       .then((result) => {
-        if (!active || !result || redirectClaimed) return;
+        if (!active || redirectClaimed) return;
+        const pending = consumeRedirectProvider();
+        if (!result) return;
         redirectClaimed = true;
-        setOpening("google");
-        return adoptRef.current(result);
+        const method = providerMethod(result, pending);
+        setOpening(method);
+        return adoptRef.current(result, method);
       })
       .catch((caught) => {
         console.error(caught);
-        if (!active) return;
-        const message = googleErrorMessage(caught);
+        if (!active || redirectClaimed) return;
+        redirectClaimed = true;
+        const pending = consumeRedirectProvider();
+        const message = pending === "apple" ? appleErrorMessage(caught) : googleErrorMessage(caught);
         if (message) setError(message);
         setOpening(null);
       });
@@ -89,32 +104,28 @@ export function SignIn() {
     router.push("/guide");
   }
 
-  async function continueGoogle() {
+  async function continueProvider(provider: Provider) {
     setError("");
-    setOpening("google");
+    setOpening(provider);
     if (!firebaseConfigured()) {
-      setError("Google-inloggningen är inte tillgänglig just nu. Försök igen om en stund.");
+      setError(
+        provider === "apple"
+          ? "Apple-inloggningen är inte tillgänglig just nu. Försök igen om en stund."
+          : "Google-inloggningen är inte tillgänglig just nu. Försök igen om en stund.",
+      );
       setOpening(null);
       return;
     }
     try {
-      const result = await signInWithGoogle();
+      const result = provider === "apple" ? await signInWithApple() : await signInWithGoogle();
       if (!result) return;
-      await adoptGoogle(result);
+      await adopt(result, provider);
     } catch (caught) {
       console.error(caught);
-      setError(googleErrorMessage(caught));
+      setError(provider === "apple" ? appleErrorMessage(caught) : googleErrorMessage(caught));
       setOpening(null);
       await signOutGoogle().catch(() => undefined);
     }
-  }
-
-  function continueApple() {
-    setError("");
-    setOpening("apple");
-    window.setTimeout(() => {
-      finish("apple", "du@icloud.com");
-    }, 900);
   }
 
   function emailError() {
@@ -153,7 +164,7 @@ export function SignIn() {
         <ProviderButton
           pending={opening === "google"}
           disabled={busy}
-          onClick={() => void continueGoogle()}
+          onClick={() => void continueProvider("google")}
           logo={<GoogleLogo />}
           label="Fortsätt med Google"
           pendingLabel="Öppnar Google…"
@@ -163,7 +174,7 @@ export function SignIn() {
         <ProviderButton
           pending={opening === "apple"}
           disabled={busy}
-          onClick={continueApple}
+          onClick={() => void continueProvider("apple")}
           logo={<AppleLogo />}
           label="Fortsätt med Apple"
           pendingLabel="Öppnar Apple…"

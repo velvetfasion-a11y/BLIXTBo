@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { googleErrorMessage, isMobileSafari, isPopupBlocked } from "../lib/firebase/google-browser.ts";
+import { appleDisplayName, appleErrorMessage, googleErrorMessage, isMobileSafari, isPopupBlocked } from "../lib/firebase/google-browser.ts";
 
 const iphoneSafari = {
   userAgent:
@@ -55,9 +55,31 @@ test("only a blocked popup falls back to redirect", () => {
   assert.equal(isPopupBlocked(new Error("no")), false);
 });
 
-test("a closed popup is not shown as a failure", () => {
+test("a closed Google popup is not shown as a failure", () => {
   assert.equal(googleErrorMessage({ code: "auth/popup-closed-by-user" }), "");
   assert.equal(googleErrorMessage({ code: "auth/cancelled-popup-request" }), "");
   assert.match(googleErrorMessage({ code: "auth/unauthorized-domain" }), /inte godkänd/);
   assert.match(googleErrorMessage({ code: "auth/network-request-failed" }), /Nätverket/);
+  assert.match(googleErrorMessage({ code: "auth/account-exists-with-different-credential" }), /redan/);
+});
+
+test("Apple errors are Swedish", () => {
+  assert.match(appleErrorMessage({ code: "auth/popup-closed-by-user" }), /avbröts/);
+  assert.match(appleErrorMessage({ code: "auth/cancelled-popup-request" }), /avbröts/);
+  assert.match(appleErrorMessage({ code: "auth/account-exists-with-different-credential" }), /redan/);
+  assert.match(appleErrorMessage({ code: "auth/unauthorized-domain" }), /Apple/);
+  assert.match(appleErrorMessage(new Error("no")), /Apple/);
+});
+
+test("Apple's name is kept from the first sign-in payload", () => {
+  assert.equal(appleDisplayName({ displayName: "Anna Lindström", profile: null }), "Anna Lindström");
+  assert.equal(
+    appleDisplayName({
+      displayName: "  ",
+      profile: { name: { firstName: "Anna", lastName: "Lindström" } },
+    }),
+    "Anna Lindström",
+  );
+  assert.equal(appleDisplayName({ displayName: null, profile: { name: "Erik Ek" } }), "Erik Ek");
+  assert.equal(appleDisplayName({ displayName: null, profile: { email: "a@icloud.com" } }), "");
 });
