@@ -27,12 +27,16 @@ def _headers(token: str = "") -> dict[str, str]:
     return headers
 
 
-def login(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+def login(client: httpx.Client, secret: dict, guard: SiteGuard | None = None, *, keepalive: bool = False) -> StepResult:
     body = {"username": secret.get("username"), "password": secret.get("password")}
     try:
         response = request(client, "POST", LOGIN, guard, json=body, headers=_headers())
     except RobotsBlocked:
         return paused("captcha", "Uppsala tillåter inte anropet", "Robots.txt spärrar inloggningen. Inget skickades.")
+    if keepalive and response.status_code >= 500:
+        return paused("unreachable", "Vi når inte Uppsala just nu", "Vi försöker igen senare.")
+    if keepalive and response.status_code == 429:
+        return paused("rate_limited", "Uppsala vill att du tar över", "Uppsala ber oss vänta. Vi försöker inte igen nu.")
     if captcha(response.status_code, response.text):
         return paused("captcha", "Uppsala vill att du tar över", "Sidan visar en kontroll. Vi försöker inte igen.")
     if response.status_code in (400, 401, 403):
@@ -92,6 +96,28 @@ def apply(client: httpx.Client, secret: dict, payload: dict, guard: SiteGuard | 
     if response.status_code >= 400 or data.get("errors"):
         return paused("site_changed", "Uppsala har ändrat ansökan", "Ansökan gick inte fram. Försöket är pausat.")
     return finished("Intresseanmälan skickad till Uppsala", "Ansökan är skickad hos Uppsala Bostadsförmedling.", "applied")
+
+
+def keepalive(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+    """Optional read: login plus GET /account/me. The scheduled job is the fee reminder."""
+    signed = login(client, secret, guard, keepalive=True)
+    if not signed.ok:
+        return signed
+    try:
+        me = _me(client, secret, guard)
+    except RobotsBlocked:
+        return paused("captcha", "Uppsala vill att du tar över", "Robots.txt spärrar sidan. Inget mer skickades.")
+    except httpx.TransportError:
+        return paused("unreachable", "Vi når inte Uppsala just nu", "Vi försöker igen senare.")
+    if me.status_code >= 500:
+        return paused("unreachable", "Vi når inte Uppsala just nu", "Vi försöker igen senare.")
+    if me.status_code == 429:
+        return paused("rate_limited", "Uppsala vill att du tar över", "Uppsala ber oss vänta. Vi försöker inte igen nu.")
+    if captcha(me.status_code, me.text):
+        return paused("captcha", "Uppsala vill att du tar över", "Sidan visar en kontroll. Vi försöker inte igen.")
+    if me.status_code in (401, 403):
+        return paused("session_expired", "Inloggningen hos Uppsala har gått ut", "Logga in en gång till.")
+    return finished("Uppsala är kollat", "Inloggningen hos Uppsala fungerar. Köavgiften påminner vi om separat.", "queue_ok")
 
 
 def renew(client: httpx.Client, secret: dict, payload: dict, guard: SiteGuard | None = None) -> StepResult:

@@ -8,7 +8,7 @@ the user's DEK, and replaces the job payload with {}. Plaintext is not stored.
 import json
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from blixtbo import crypto, landlords
 from blixtbo.models import Approval, Job, LandlordLogin, Notice, User
@@ -32,7 +32,7 @@ APPLY_KEYS = (
 
 
 def _notify(db, user_id: str, kind: str, title: str, body: str) -> None:
-    row = Notice(id=str(uuid.uuid4()), user_id=user_id, kind=kind[:40], title=title[:160], body=body)
+    row = Notice(id=str(uuid.uuid4()), user_id=user_id, kind=kind[:80], title=title[:160], body=body)
     db.add(row)
     try:
         from blixtbo.push import notify_user
@@ -112,6 +112,23 @@ def build_apply_payload(listing_id: str, body: dict) -> dict:
     return payload
 
 
+def _apply_still_allowed(db, user: User, job_id: str) -> bool:
+    """Stop a queued application once the free sends are used up. Premium is unlimited."""
+    from blixtbo.billing import allow_application
+    from blixtbo.config import settings
+
+    used = db.query(Job).filter(Job.user_id == user.id, Job.kind == "apply", Job.status != "failed", Job.id != job_id).count()
+    entitlement = None
+    if settings.data_backend == "firestore" and getattr(user, "firebase_uid", None):
+        try:
+            from blixtbo.keepalive import read_entitlement
+
+            entitlement = read_entitlement(user.firebase_uid)
+        except Exception:
+            entitlement = None
+    return allow_application(used, entitlement)
+
+
 def run_job(db, job: Job) -> None:
     user = db.get(User, job.user_id)
     if user is None:
@@ -123,7 +140,16 @@ def run_job(db, job: Job) -> None:
         if job.kind == "create_account":
             _create(db, user, job)
         elif job.kind in ("apply", "renew"):
+            if job.kind == "apply" and not _apply_still_allowed(db, user, job.id):
+                job.status = "failed"
+                job.last_error = "premium_required"
+                return
             _use_login(db, user, job)
+        elif job.kind == "keepalive":
+            from blixtbo.keepalive import execute_job
+
+            execute_job(db, user, job)
+            return
         elif job.kind == "store_session":
             store_session(db, user, job)
         elif job.kind == "store_credentials":
@@ -272,7 +298,6 @@ def _activate(login: LandlordLogin) -> None:
     login.last_error = None
     login.last_login_at = now
     login.approved_at = login.approved_at or now
-    login.next_renewal_at = now + timedelta(days=30)
 
 
 def _create(db, user: User, job: Job) -> None:
@@ -386,6 +411,10 @@ def store_credentials(db, user: User, job: Job) -> None:
     result = landlords.run_login(job.source_id, {"username": secret["username"], "password": secret["password"]})
     secret["password"] = ""
     _finish(db, user, job, login, result)
+    if login.status == "active":
+        from blixtbo.keepalive import schedule_after_save
+
+        schedule_after_save(login)
 
 
 def store_session(db, user: User, job: Job) -> None:
@@ -411,6 +440,9 @@ def store_session(db, user: User, job: Job) -> None:
     job.payload = "{}"
     job.status = "done"
     _activate(login)
+    from blixtbo.keepalive import schedule_after_save
+
+    schedule_after_save(login)
     waiting = (
         db.query(Job)
         .filter(Job.user_id == user.id, Job.source_id == job.source_id, Job.status.in_(("waiting_bankid", "waiting_user")))
@@ -439,6 +471,10 @@ def queue_due_renewals(db) -> int:
     )
     queued = 0
     for login in due:
+        from blixtbo.keepalive import renewal_disabled
+
+        if renewal_disabled(login.source_id, login):
+            continue
         already = (
             db.query(Job)
             .filter(

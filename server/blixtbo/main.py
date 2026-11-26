@@ -7,7 +7,7 @@ import httpx
 import pyotp
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy.orm import Session
 
@@ -25,7 +25,7 @@ from blixtbo.account import (
     run_deletion,
     valid_uid,
 )
-from blixtbo.billing import as_dict, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, firebase_uid_from_event, is_stripe_secret_key, price_lookup_key, price_ore, resume_subscription, schedule_cancel, subscription_view
+from blixtbo.billing import allow_application, as_dict, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, firebase_uid_from_event, is_stripe_secret_key, price_lookup_key, price_ore, resume_subscription, schedule_cancel, subscription_data, subscription_view
 from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
 from blixtbo.models import AuditLog, Job, LandlordLogin, Notice, User
@@ -35,7 +35,7 @@ app = FastAPI(title="Blixtbo", docs_url=None, redoc_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:43123", "http://localhost:43123"],
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["POST", "PUT", "GET", "OPTIONS"],
     allow_headers=["*"],
 )
 serializer = URLSafeTimedSerializer(settings.app_secret, salt="blixtbo-session")
@@ -209,11 +209,10 @@ def billing_subscribe(request: Request, db: Session = Depends(get_db)) -> dict:
         subscription = stripe.Subscription.create(
             customer=customer.id,
             items=[{"price": price_id}],
-            trial_period_days=settings.trial_days,
             payment_behavior="default_incomplete",
             payment_settings={"save_default_payment_method": "on_subscription"},
-            metadata={"firebaseUid": user.firebase_uid},
             expand=["pending_setup_intent", "latest_invoice.payment_intent"],
+            **subscription_data(user.firebase_uid),
         )
     raw = subscription.to_dict() if hasattr(subscription, "to_dict") else subscription
     try:
@@ -241,7 +240,7 @@ def _reusable_subscription(stripe, customer_id: str):
     listed = stripe.Subscription.list(customer=customer_id, status="all", limit=10)
     for item in listed.data:
         status = str(getattr(item, "status", "") or item.get("status") or "")
-        if status not in ("incomplete", "trialing", "active", "paused"):
+        if status not in ("incomplete", "active", "paused"):
             continue
         full = stripe.Subscription.retrieve(
             item.id,
@@ -277,7 +276,7 @@ def _subscription_state(user: User):
     for item in getattr(listed, "data", None) or []:
         raw = as_dict(item)
         fallback = fallback or raw
-        if str(raw.get("status") or "") in ("active", "trialing", "paused", "past_due", "incomplete"):
+        if str(raw.get("status") or "") in ("active", "paused", "past_due", "incomplete"):
             chosen = raw
             break
     return stripe, chosen or fallback
@@ -609,10 +608,40 @@ def save_session(source_id: str, body: dict, user: User = Depends(require_user),
     return {"queued": True, "source_id": source_id}
 
 
+@app.put("/connections/{source_id}/fee-due")
+def set_fee_due(source_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    """The user types the queue-fee date. We never guess it and we never pay it."""
+    from blixtbo.keepalive import effective_strategy, parse_fee_date
+
+    if effective_strategy(source_id) != "fee_reminder":
+        raise HTTPException(status_code=400, detail="Den här hyresvärden har ingen köavgift att påminna om.")
+    try:
+        due = parse_fee_date((body or {}).get("date"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Skriv datumet som ÅÅÅÅ-MM-DD.")
+    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id=source_id).one_or_none()
+    if login is None:
+        raise HTTPException(status_code=404, detail="Ingen koppling.")
+    login.fee_due_at = due
+    login.keepalive_state = "fee_due"
+    db.commit()
+    return public_connection(login)
+
+
 @app.get("/connections")
 def list_connections(user: User = Depends(require_user), db: Session = Depends(get_db)) -> list:
+    from blixtbo.keepalive import effective_strategy, latest_notice_title
+
     rows = db.query(LandlordLogin).filter_by(user_id=user.id).all()
-    return [public_connection(row) for row in rows]
+    views = []
+    for row in rows:
+        view = public_connection(row)
+        view["keepalive_strategy"] = effective_strategy(row.source_id, row)
+        notice = latest_notice_title(db, user.id, row.source_id)
+        if notice:
+            view["keepalive_notice"] = notice
+        views.append(view)
+    return views
 
 
 @app.get("/notices")
@@ -626,6 +655,10 @@ def list_notices(user: User = Depends(require_user), db: Session = Depends(get_d
             "body": row.body,
             "read": row.read,
             "at": row.created_at.isoformat() if row.created_at else None,
+            "action_label": row.action_label or "",
+            "action_href": row.action_href or "",
+            "secondary_label": row.secondary_label or "",
+            "secondary_href": row.secondary_href or "",
         }
         for row in rows
     ]
@@ -655,6 +688,28 @@ def public_listings_client():
     return httpx.Client(timeout=20.0, follow_redirects=False)
 
 
+def _application_entitlement(user: User) -> dict | None:
+    if settings.data_backend != "firestore" or not user.firebase_uid:
+        return None
+    try:
+        from blixtbo.keepalive import read_entitlement
+
+        return read_entitlement(user.firebase_uid)
+    except Exception:
+        return None
+
+
+def applications_sent(db: Session, user_id: str, exclude_job_id: str | None = None) -> int:
+    query = db.query(Job).filter(Job.user_id == user_id, Job.kind == "apply", Job.status != "failed")
+    if exclude_job_id:
+        query = query.filter(Job.id != exclude_job_id)
+    return query.count()
+
+
+def _application_allowed(db: Session, user: User, exclude_job_id: str | None = None) -> bool:
+    return allow_application(applications_sent(db, user.id, exclude_job_id), _application_entitlement(user))
+
+
 @app.post("/listings/{listing_id}/apply")
 def apply(listing_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
     source_id = str(body.get("source_id") or "")
@@ -667,6 +722,8 @@ def apply(listing_id: str, body: dict, user: User = Depends(require_user), db: S
     payload = build_apply_payload(listing_id, body)
     if (site.binding_apply or site.message_apply) and not payload.get("confirmed"):
         raise HTTPException(status_code=409, detail="Bekräfta i appen innan något skickas.")
+    if not _application_allowed(db, user):
+        raise HTTPException(status_code=402, detail="Premium krävs för att fortsätta.")
     db.add(Job(user_id=user.id, source_id=source_id, kind="apply", payload=json.dumps(payload, ensure_ascii=False)))
     db.commit()
     return {"queued": True, "listing_id": listing_id}
@@ -745,6 +802,74 @@ def admin_users(owner: User = Depends(require_owner), db: Session = Depends(get_
     rows = db.query(User).order_by(User.created_at.desc()).limit(200).all()
     return [{"id": row.id, "email": row.email, "name": row.name, "method": row.auth_method} for row in rows]
 
+
+def _review_error(exc):
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@app.get("/reviews")
+def reviews_mine(user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, list_my_reviews
+
+    try:
+        return {"reviews": list_my_reviews(db, user)}
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.post("/reviews")
+def reviews_create(body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, create_review
+
+    try:
+        return create_review(db, user, body)
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.put("/reviews/{application_id}")
+def reviews_update(application_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, update_review
+
+    try:
+        return update_review(db, user, application_id, body)
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.get(settings.admin_path + "/reviews.csv")
+def reviews_admin_csv(rating: str | None = None, owner: User = Depends(require_owner), db: Session = Depends(get_db)) -> Response:
+    from blixtbo.reviews import ReviewError, admin_reviews_csv
+
+    try:
+        body = admin_reviews_csv(db, rating)
+    except ReviewError as exc:
+        _review_error(exc)
+    audit(db, owner.email, "admin.reviews.csv", rating or "")
+    return Response(
+        content=body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="recensioner.csv"'},
+    )
+
+
+@app.get(settings.admin_path + "/reviews")
+def reviews_admin(rating: str | None = None, owner: User = Depends(require_owner), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, admin_reviews
+
+    try:
+        payload = admin_reviews(db, rating)
+    except ReviewError as exc:
+        _review_error(exc)
+    audit(db, owner.email, "admin.reviews", rating or "")
+    return payload
+
+
+from blixtbo.support import register as register_support
+
+register_support(app, get_db, require_user)
 
 from blixtbo.ios_api import router as ios_router
 

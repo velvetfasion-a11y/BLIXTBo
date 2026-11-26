@@ -1,13 +1,13 @@
-import { premiumPriceKr, trialDays } from "@/lib/billing";
+import { premiumPriceKr } from "@/lib/billing";
 
 export const SITE_URL = "https://blixtbo.se";
 
-export const HOME_TITLE = "Lediga lägenheter i Stockholm – ansök först | Blixtbo";
+export const HOME_TITLE = "Blixtbo: Lediga lägenheter i Stockholm – bli först till kvarn";
 
 export const HOME_DESCRIPTION =
-  "Se lediga hyresrätter och förstahandskontrakt i Stockholm på ett ställe. Blixtbo bevakar annonserna och köerna och skickar din ansökan först.";
+  "Se lediga hyresrätter och förstahandskontrakt i Stockholm på ett ställe. Blixtbo bevakar annonserna och köerna, så att du kan bli först till kvarn.";
 
-export const HOME_H1 = "Se alla lediga lägenheter på ett ställe – och ansök först";
+export const HOME_H1 = "Se alla lediga lägenheter på ett ställe – och bli först till kvarn";
 
 export const HOME_SUBLINE =
   "Blixtbo bevakar hyresvärdarnas annonser och bostadsköer åt dig. Ett svep, så skickas din ansökan innan de andra hunnit läsa klart.";
@@ -19,7 +19,7 @@ export const HOME_SECTIONS = [
   },
   {
     title: "Ansök direkt – utan att fylla i allt om och om igen",
-    body: "Du fyller i din profil en gång: yrke, inkomst, hushåll, personligt brev och dokument. Ett svep på en ledig lägenhet skickar ansökan med samma profil. Hyresvärden bestämmer vem som får lägenheten och skriver kontraktet med dig. Blixtbo gör att du hinner först med ansökan.",
+    body: "Du fyller i din profil en gång: yrke, inkomst, hushåll, personligt brev och dokument. Ett svep på en ledig lägenhet skickar ansökan med samma profil. Hyresvärden bestämmer vem som får lägenheten och skriver kontraktet med dig. Blixtbo gör att du kan bli först till kvarn.",
   },
   {
     title: "Hyresrätter i Stockholm, där du vill bo",
@@ -36,15 +36,13 @@ export const HOME_STEPS = [
 
 export function includedCopy() {
   const price = premiumPriceKr();
-  const days = trialDays();
-  return `Gratis: bevakning och ansökningar upp till ett tak. Premium: inga tak på automatiska ansökningar, ${price} kr/månad efter ${days} dagars prov. Avsluta när du vill under Inställningar.`;
+  return `Premium håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna. ${price} kr/månad. Avsluta när du vill under Inställningar.`;
 }
 
 export type FaqItem = { question: string; answer: string };
 
 export function homeFaqs(): FaqItem[] {
   const price = premiumPriceKr();
-  const days = trialDays();
   return [
     {
       question: "Var hittar jag lediga lägenheter i Stockholm?",
@@ -83,7 +81,7 @@ export function homeFaqs(): FaqItem[] {
     },
     {
       question: "Vad kostar Blixtbo?",
-      answer: `Att bevaka och ansöka är gratis upp till ett tak. Premium kostar ${price} kr/månad efter ${days} dagars prov och tar bort taket. Du avslutar under Inställningar, Prenumeration.`,
+      answer: `Premium kostar ${price} kr/månad. Det håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna. Du avslutar under Inställningar, Prenumeration.`,
     },
     {
       question: "Vilka områden kan jag söka i?",
@@ -125,7 +123,13 @@ export function organizationJsonLd() {
         "@id": `${SITE_URL}/#organization`,
         name: "Blixtbo",
         url: SITE_URL,
-        logo: `${SITE_URL}/icon-512.png`,
+        logo: {
+          "@type": "ImageObject",
+          url: `${SITE_URL}/logo.png`,
+          width: 512,
+          height: 512,
+          name: "Blixtbo",
+        },
       },
       {
         "@type": "WebSite",
@@ -141,7 +145,6 @@ export function organizationJsonLd() {
 
 export function webApplicationJsonLd() {
   const price = premiumPriceKr();
-  const days = trialDays();
   return {
     "@context": "https://schema.org",
     "@type": "WebApplication",
@@ -157,7 +160,7 @@ export function webApplicationJsonLd() {
         name: "Gratis",
         price: "0",
         priceCurrency: "SEK",
-        description: "Bevakning och ansökningar upp till ett tak.",
+        description: "Bevakning av hyresvärdarnas annonser.",
         url: SITE_URL,
       },
       {
@@ -165,7 +168,7 @@ export function webApplicationJsonLd() {
         name: "Premium",
         price: String(price),
         priceCurrency: "SEK",
-        description: `${price} kr per månad efter ${days} dagars provperiod.`,
+        description: `${price} kr per månad.`,
         url: SITE_URL,
         priceSpecification: {
           "@type": "UnitPriceSpecification",

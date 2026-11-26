@@ -35,6 +35,12 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
 });
 await assertSucceeds(getDoc(doc(alice.firestore(), "users/alice/billing/entitlement")));
 await assertFails(setDoc(doc(alice.firestore(), "users/alice/billing/entitlement"), { plan: "premium" }));
+await testEnv.withSecurityRulesDisabled(async (context) => {
+  await setDoc(doc(context.firestore(), "users/alice/reviews/app-1"), { rating: 5, text: "Bra" });
+});
+await assertSucceeds(getDoc(doc(alice.firestore(), "users/alice/reviews/app-1")));
+await assertFails(setDoc(doc(alice.firestore(), "users/alice/reviews/app-1"), { rating: 1 }));
+await assertFails(getDoc(doc(bob.firestore(), "users/alice/reviews/app-1")));
 await assertFails(setDoc(doc(bob.firestore(), "users/alice/customLandlords/exempel"), { name: "Inte din" }));
 await assertFails(getDoc(doc(bob.firestore(), "users/alice/customLandlords/exempel")));
 await assertFails(setDoc(doc(bob.firestore(), "users/alice/swipes/blekinge"), { direction: "no" }));

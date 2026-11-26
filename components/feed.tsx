@@ -41,6 +41,12 @@ export function Feed() {
     document.title = "Hem · Blixtbo";
   }, []);
 
+  useEffect(() => {
+    const open = () => setPaywall(true);
+    window.addEventListener("blixtbo-paywall", open);
+    return () => window.removeEventListener("blixtbo-paywall", open);
+  }, []);
+
   const deck = useMemo(() => {
     const applied = new Set(store.applications.filter((item) => item.status !== "aterkallad").map((item) => item.listingId));
     const skipped = new Set(store.dismissed);

@@ -1,0 +1,243 @@
+# Extra fakta för support
+
+Det här är underhållen kunskap utöver sidornas text. Bygget lägger till sidkopian automatiskt.
+
+Blixtbo äger inga lägenheter, hyr inte ut bostäder och är inte en bostadsförmedling. Hyresvärden väljer vem som får kontraktet. Användaren skriver avtalet med hyresvärden.
+
+En ansökan skickas bara när användaren själv sveper ja eller bekräftar i appen. Assistenten kan inte skicka, ändra eller ta tillbaka en ansökan.
+
+Köplatser kan hållas aktiva under Profil, med valet Håll mina köplatser aktiva automatiskt. Då loggar Blixtbo in hos hyresvärden och bekräftar kön. En missad förnyelse kan nollställa kötid. BankID sparas aldrig. Hyresvärdens lösenord sparas krypterat.
+
+Premium kostar 99 kr per månad. Det håller köplatser aktiva och förnyar dem, hjälper dig bli först till kvarn och bevakar hyresvärdarnas annonser och köer. Blixtbo äger inga lägenheter.
+
+Uppsägning, paus och ånger görs under Inställningar och sedan Prenumeration, eller genom att skriva till support. Assistenten lovar aldrig en återbetalning. En människa avgör betalningsärenden.
+
+Radering görs av användaren under Inställningar. Ordet som ska skrivas är RADERA. Supportärenden och chattar tas bort när kontot raderas och när alla uppgifter raderas. De ligger kvar om användaren bara kopplar bort hyresvärdar.
+
+Support svarar inom 24 timmar. Adressen är support@blixtbo.se. Osäkerhet, bugg, betalning, återbetalning, radering av konto och en önskan att prata med en människa lämnas vidare med verktyget escalate_to_owner. Ägaren ser olästa ärenden under Admin och Ärenden.
+
+## lib/billing.ts
+Premium är pausat. Automatiska ansökningar är av.
+Prenumerationen är avslutad.
+Premium är igång. kr i månaden.
+Ingen Premium just nu.
+Premium kostar 99 kr per månad.
+
+## lib/account.ts
+Radera bara Blixtbo-kontot
+Kontot stängs och går inte att logga in på. Sådant som inte är själva kontot lämnas kvar.
+Namn, e-post och kopplingen till inloggningen i Blixtbo
+Recensioner du lämnat i Blixtbo
+Supportärenden och chattar med support
+Möjligheten att öppna det här kontot
+Profil, ansökningar, sparade sökningar och filter
+Meddelanden och notiser
+Sparade inloggningar hos hyresvärdar
+Loggar som pekar på dig
+Stripe-kund och betalunderlag
+Firebase-kontot, alltså Google, Apple eller e-post
+Radera alla uppgifter om mig
+Det här är radering enligt dataskyddsförordningen (GDPR). Vi tar bort det som går att koppla till dig.
+Profil, ansökningar, köer, svep och erbjudanden
+Sparade sökningar och filter
+Prenumerationen avslutas
+Firebase-kontot tas bort
+Fakturor och andra betalunderlag hos Stripe. Bokföringslagen kräver att de sparas. De kopplas inte längre till ditt namn eller din e-post.
+Koppla bort länkade konton
+Blixtbo-kontot finns kvar. Inloggningar som appen har sparat hos andra tas bort.
+Kopplingen till Google och Apple
+Blixtbo-kontot, profilen, ansökningar, filter, meddelanden och recensioner
+Om Google eller Apple är ditt enda sätt att logga in behöver du en ny inloggning nästa gång. Kontot och uppgifterna finns kvar.
+
+## components/privacy.tsx
+Så behandlar Blixtbo personuppgifter enligt dataskyddsförordningen (GDPR).
+Lagring och mottagare
+När du loggar in med Google tar vi emot namn, e-postadress och kontots identifierare, så att vi kan skapa kontot och känna igen dig. Väljer du Apple i stället gäller samma sak för det Apple-konto du använder för inloggningen. Vi får inte tillgång till övriga delar av Google- eller Apple-kontot.
+Hyresvärdarnas inloggningar.
+När du kopplar en hyresvärd sparas användarnamn och lösenord krypterat, så att Blixtbo kan bevaka kön och skicka ansökan. BankID sparas inte.
+Profilen du fyller i, till exempel yrke, inkomst, hushåll, brev och dokument, samt sparade sökningar, filter, ansökningar, meddelanden och notiser.
+Betalningar via Stripe.
+Kortuppgifter hanteras av Stripe. Blixtbo lagrar inte hela kortnumret. Vi sparar kund- och prenumerationsidentitet hos Stripe, status, period och om en uppsägning är planerad, så att vi vet om Premium är igång.
+Supportärenden och chatt.
+Uppgifterna används för att tillhandahålla bevakning, notiser och ansökningar, för att ta betalt för Premium, och för att hålla kontot säkert. Det görs för att fullgöra avtalet med dig.
+Fakturor och andra betalunderlag sparas för att uppfylla bokföringslagen. Det är en rättslig förpliktelse. De används inte till marknadsföring.
+Kontouppgifter sparas så länge kontot finns. Krypterade inloggningar hos hyresvärdar tas bort när du kopplar bort dem eller ber oss radera uppgifterna. Betalunderlag behålls den tid bokföringslagen kräver, normalt sju år, men kopplas inte längre till ditt namn eller din e-post när Stripe-kunden anonymiseras.
+Betalningar hanteras av Stripe. Inloggning och kontots uppgifter hanteras med Google Firebase. De behandlar uppgifterna för Blixtbos räkning för de delarna. En del av behandlingen kan ske utanför EU, med de skyddsåtgärder leverantörerna tillhandahåller för sådan överföring.
+Du kan begära tillgång, rättelse, radering, begränsning och dataportabilitet, och invända mot behandling som stödjer sig på berättigat intresse. Du kan också klaga hos Integritetsskyddsmyndigheten, imy.se.
+Radering gör du själv under Inställningar när du är inloggad. Du skriver RADERA innan något händer. Radera bara Blixtbo-kontot stänger inloggningen och tar bort supportärenden och chattar. Radera alla uppgifter om mig tar bort profil, ansökningar, meddelanden, supportärenden och chattar, hyresvärdarnas inloggningar och loggar som pekar på dig, avslutar prenumerationen och anonymiserar Stripe-kunden. Kopplar du bara bort länkade konton ligger supportärendena kvar. Hur de tre valen skiljer sig beskrivs under Hjälp.
+När du har fått en lägenhet kan du lämna ett betyg från 1 till 5 och en valfri text, högst ungefär 1 000 tecken. Vi sparar ditt användar-id, betyget, texten, hyresvärden om den hör till ansökan, tidpunkten och om du samtyckt till att recensionen visas.
+Samtycket är frivilligt. Kryssar du i att vi får visa recensionen används bara förnamn. Utan den rutan visas recensionen inte för andra. Du kan ändra recensionen efteråt. Det finns en recension per lägenhet du har fått.
+Recensioner raderas när Blixtbo-kontot raderas, och när du ber om att alla uppgifter om dig raderas. Att bara koppla bort Google, Apple eller en hyresvärd lämnar recensionen kvar, eftersom kontot finns kvar.
+
+## components/terms.tsx
+Köpvillkor för Blixtbo Premium
+Det här gäller när du betalar för Blixtbo Premium.
+Blixtbo är en sök- och aviseringstjänst. Vi bevakar hyresvärdarnas annonser och köer och kan skicka din ansökan med profilen du fyllt i. Blixtbo äger inga lägenheter, hyr inte ut bostäder och förmedlar inte hyreskontrakt. Vi kan inte garantera att du får en lägenhet. Hyresvärden bestämmer vem som får kontraktet, och du skriver avtalet med hyresvärden.
+Kortet sparas när du startar, så att den månatliga dragningen kan ske. Det är inte en rabattkod.
+Du kan säga upp när som helst under Inställningar och sedan Prenumeration. Uppsägningen gäller till periodens slut. Du behåller Premium tills den påbörjade perioden tar slut. Därefter görs inga fler dragningar. Du kan ångra ett planerat avslut på samma sida innan perioden tar slut.
+Du har 14 dagars ångerrätt enligt lagen (2005:59) om distansavtal och avtal utanför affärslokaler. Fristen räknas från den dag avtalet ingås, alltså när du startar Premium.
+Genom att starta Premium begär du att den digitala tjänsten börjar levereras omedelbart, under ångerfristen, och du bekräftar att du känner till hur det påverkar ångerrätten. För en löpande digital tjänst innebär det att du kan få betala en proportionell del för den tid du hunnit använda tjänsten om du ångrar dig efter att leveransen har börjat. Ångerrätten upphör när tjänsten är fullgjord i sin helhet, om du i förväg uttryckligen har samtyckt till att den påbörjas och bekräftat att du därmed förlorar ångerrätten när avtalet är fullgjort.
+Premium är en löpande tjänst. Säger du upp inom 14 dagar och ångerrätten fortfarande gäller återbetalar vi den dragna månadsavgiften.
+Efter en genomförd dragning gäller en vanlig uppsägning till periodens slut, och den redan betalda perioden betalas inte tillbaka. Undantaget är när ångerrätten ger rätt till återbetalning, eller när vi har dragit fel belopp.
+En återbetalning går tillbaka till samma betalmedel via Stripe. Att en ansökan inte leder till en lägenhet är inte skäl för återbetalning. Blixtbo kan inte garantera en bostad.
+Fakturor och andra betalunderlag behålls enligt bokföringslagen. De kopplas bort från ditt namn och din e-post om du ber oss radera uppgifterna om dig.
+
+## components/help.tsx
+Kort om hur Blixtbo fungerar, vad en betalning innebär, och hur du tar bort konto eller uppgifter.
+Till inställningar
+Guider om att hyra
+Steg för steg om personbevis, köer, borgen och vad hyresvärdar brukar kräva. Guiderna är allmän information, inte juridisk rådgivning, och Blixtbo garanterar inget kontrakt.
+Hur Blixtbo fungerar
+Blixtbo bevakar hyresvärdarnas annonser och lägger nya bostäder överst. Du anger område, hyra, storlek och inflytt en gång. Ett ja kan skicka ansökan med profilen du redan fyllt i.
+Samma profil används hos varje hyresvärd: yrke, inkomst, hushåll, brev och dokument. Under Koll ser du ansökningar, ködagar och när en kö behöver förnyas.
+Premium håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna.
+Betalning och avslut
+Avsluta prenumerationen via Inställningar och sedan Prenumeration. Du behåller Premium tills den betalda perioden tar slut. Därefter blir kontot gratis, och inga fler dragningar görs. Du kan ångra ett planerat avslut innan perioden tar slut, på samma sida.
+En paus stänger av automatiska ansökningar utan att avsluta kontot. Den finns också under Prenumeration.
+Radering av konto och uppgifter
+Under Inställningar, när du är inloggad, finns tre val. Du skriver RADERA innan något händer. Om inloggningen är för gammal ber vi dig logga in igen i ett fönster.
+Radera bara Blixtbo-kontot.
+Namn, e-post och kopplingen till inloggningen tas bort, så kontot går inte att öppna. Recensioner, supportärenden och chattar med support tas också bort. Ansökningar, sparade sökningar och filter, meddelanden, hyresvärdarnas inloggningar, loggar och betaluppgifter lämnas kvar. Firebase-kontot finns kvar.
+Radera alla uppgifter om mig.
+Det är radering enligt dataskyddsförordningen (GDPR). Profil, ansökningar, recensioner, sparade sökningar och filter, meddelanden och notiser, supportärenden och chattar med support, sparade inloggningar hos hyresvärdar och loggar som pekar på dig tas bort. Prenumerationen avslutas. Stripe-kunden anonymiseras, och Firebase-kontot tas bort.
+Fakturor och andra betalunderlag behålls, eftersom bokföringslagen kräver det. De kopplas inte längre till ditt namn eller din e-post.
+Koppla bort länkade konton.
+Inloggningar hos hyresvärdar tas bort, och Google och Apple kopplas bort. Blixtbo-kontot, profilen och prenumerationen finns kvar. Om Google eller Apple är ditt enda sätt att logga in behöver du en ny inloggning nästa gång.
+Hyresvärdarnas inloggning och säkerhet
+När du kopplar en hyresvärd sparas inloggningen krypterad, så att Blixtbo kan bevaka kön och skicka ansökan. BankID sparas inte. Du kan koppla bort hyresvärdarna under Inställningar, valet Koppla bort länkade konton, eller en och en under Hyresvärdar.
+Google och Apple används bara för att logga in i Blixtbo. De ger inte hyresvärden tillgång till ditt Google- eller Apple-konto.
+
+## components/settings.tsx
+Inloggningen avbröts. Inget är raderat.
+Det gick inte att bekräfta inloggningen. Inget är raderat.
+Det gick inte att slutföra. Inget mer är ändrat.
+Inställningar · Blixtbo
+Engångskod till e-post
+Logga in med Google eller Apple för att göra det här mot kontot.
+Hyresvärdarna är bortkopplade i den här webbläsaren. Exempelkontot har ingen molninloggning.
+Klart. Inloggningar hos hyresvärdar är borttagna, och Google och Apple är bortkopplade. Blixtbo-kontot finns kvar.
+Skriv RADERA för att bekräfta
+Knappen går att trycka först när ordet står exakt så.
+Här hanterar du kontot. Prenumerationen ligger ett steg in. Radering ligger längst ner och kräver att du skriver ordet RADERA.
+Så fungerar Blixtbo, betalning och uppgifter
+Personbevis, köer, borgen och vad hyresvärdar kräver
+Uppgifter, recensioner och radering
+Radera eller koppla bort
+Välj ett alternativ. Läs vad som tas bort och vad som lämnas kvar innan du bekräftar. Det går inte att ångra i efterhand.
+Det här lämnas kvar
+
+## components/profile.tsx
+Engångskod till e-post
+Allt underlag som hyresvärdar brukar be om finns på plats.
+Komplettera profilen
+Yrke, inkomst, hushåll, brev
+Avtal, lönespecifikationer, personbevis
+Område, hyra, storlek, inflytt
+Prenumeration, hjälp och konto
+Håll mina köplatser aktiva automatiskt
+Nya bostäder direkt
+Köavgifter och förnyelse
+Status på ansökningar
+En missad förnyelse kan nollställa flera års kötid. Med automatiken loggar Blixtbo in och bekräftar varje kö i tid.
+Förhandsvisning för ägaren
+Återställ prototypen
+
+## lib/seo.ts
+Blixtbo: Lediga lägenheter i Stockholm – bli först till kvarn
+Se lediga hyresrätter och förstahandskontrakt i Stockholm på ett ställe. Blixtbo bevakar annonserna och köerna, så att du kan bli först till kvarn.
+Se alla lediga lägenheter på ett ställe – och bli först till kvarn
+Blixtbo bevakar hyresvärdarnas annonser och bostadsköer åt dig. Ett svep, så skickas din ansökan innan de andra hunnit läsa klart.
+Ha koll på alla bostäder och köer
+Nya hyresrätter och förstahandskontrakt hamnar överst, med de områden, den hyra och den storlek du valt. Under Koll ser du dina ansökningar, ködagar och när en kö behöver förnyas, så att du inte förlorar kötid.
+Ansök direkt – utan att fylla i allt om och om igen
+Du fyller i din profil en gång: yrke, inkomst, hushåll, personligt brev och dokument. Ett svep på en ledig lägenhet skickar ansökan med samma profil. Hyresvärden bestämmer vem som får lägenheten och skriver kontraktet med dig. Blixtbo gör att du kan bli först till kvarn.
+Hyresrätter i Stockholm, där du vill bo
+Bevaka innerstan, Gärdet och Hjorthagen, Hammarby Sjöstad, Liljeholmen, Solna och Sundbyberg. Välj max hyra och våning, så får du bara lägenheter som passar.
+Välj område, hyra och storlek.
+Fyll i din profil en gång.
+Svep på en ledig lägenhet för att skicka ansökan.
+Följ ansökningar och köer under Koll.
+Premium håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna. kr/månad. Avsluta när du vill under Inställningar.
+Var hittar jag lediga lägenheter i Stockholm?
+Hyresvärdarna annonserar på sina egna sidor, hos Bostadsförmedlingen och på andra portaler. Blixtbo bevakar annonserna åt dig och visar nya lägenheter som matchar dina val, så du slipper kolla flera ställen själv.
+Hur får jag ett förstahandskontrakt i Stockholm?
+De flesta förstahandskontrakt går via bostadskö, lottning eller först till kvarn. Ställ dig i köerna, bevaka nya annonser och ansök snabbt. Blixtbo hjälper dig bevaka köer och skicka ansökan snabbt. Hyresvärden väljer själv vem som får kontraktet.
+Kan jag hyra en lägenhet i Stockholm utan kö?
+Ja, en del hyresvärdar delar ut lägenheter genom först till kvarn eller lottning, då spelar kötiden ingen roll. Blixtbo tar inte bort köer, men hjälper dig att hinna med de lägenheter som går utan kö.
+Hur fungerar bostadskön i Stockholm?
+Du samlar kötid, oftast en dag per dag, hos Bostadsförmedlingen och hos andra hyresvärdar. Kötiden räknas först när du står i kön, och den kan försvinna om du inte förnyar medlemskapet. Blixtbo visar när en kö behöver förnyas.
+Hur lång tid tar det att få lägenhet i Stockholm?
+Det varierar mycket. Förstahandskontrakt via kö kan ta flera år, men ansökningar utan kö går på dagar. Många annonser är borta efter några dagar, så snabb ansökan ökar chansen.
+Är Blixtbo en hyresvärd eller en bostadsförmedling?
+Nej. Blixtbo äger inga lägenheter och förmedlar inte kontrakt. Vi bevakar hyresvärdarnas annonser och skickar din ansökan åt dig. Du skriver kontrakt direkt med hyresvärden.
+Kan jag hyra lägenhet utan inkomst?
+Det är svårt. De flesta hyresvärdar kräver inkomst eller borgensman. Några har andra villkor, så läs kraven i annonsen innan du ansöker. Blixtbo lovar inte att du blir godkänd.
+Vad kostar Blixtbo?
+Premium kostar kr/månad. Det håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna. Du avslutar under Inställningar, Prenumeration.
+Vilka områden kan jag söka i?
+Innerstan, Gärdet och Hjorthagen, Hammarby Sjöstad, Liljeholmen, Solna och Sundbyberg. Fler områden kommer.
+Vad är skillnaden mellan första och andra hand?
+Förstahandskontrakt är ditt eget kontrakt med hyresvärden. Andrahand är när någon som själv hyr lånar ut sin lägenhet, oftast tidsbegränsat. Blixtbo fokuserar på förstahandskontrakt.
+Bevakning av hyresvärdarnas annonser.
+
+## components/connections.tsx
+Behöver nytt lösenord
+Hålls aktiv · senast
+Betala köavgiften före
+Pausad – kräver Premium
+Hyresvärdar · Blixtbo
+Uppdatera lösenord
+Logga in för att spara datumet.
+Sparat. Vi påminner dig.
+store.connections[source.id]?.status === "connected").length; return (
+Förnyelse kan kräva ett nytt BankID-godkännande. Du får en notis.
+Köavgift förfaller
+
+## components/subscription.tsx
+Pausa – jag har hittat bostad
+Hantera prenumeration
+
+## components/subscription-manage.tsx
+Premium avslutas . Du har tillgång tills perioden tar slut, och inga fler dragningar görs.
+Premium är pausat. Automatiska ansökningar är av, och inga nya dragningar görs förrän du återupptar.
+Prenumerationen är avslutad. Inga fler dragningar görs.
+Premium är igång. kr i månaden.
+Ingen Premium just nu.
+Prenumeration · Blixtbo
+Prenumerationen kunde inte hämtas.
+Det gick inte att uppdatera prenumerationen.
+Exempelkontot har ingen riktig prenumeration.
+Återuppta prenumerationen
+Avsluta prenumerationen
+Hämtar prenumeration…
+Avsluta prenumeration
+Pausa – jag har hittat bostad
+Avsluta prenumerationen?
+
+## components/paywall.tsx
+Betalningen gick inte att starta.
+Familjen Grotesk, Avenir Next, sans-serif
+Kortet gick inte att bekräfta.
+Håller dina köplatser aktiva och förnyar dem.
+Skickar din ansökan med profilen du redan fyllt i, så att du kan bli först till kvarn.
+Bevakar hyresvärdarnas annonser och köer.
+Kortfältet kräver en pk_test_- eller pk_live_-nyckel.
+Logga in med Google så att betalningen stannar i appen.
+Stripe gav ingen client_secret.
+Gick inte att pausa.
+Gick inte att återuppta.
+Missa inte nästa lägenhet
+De bästa lägenheterna försvinner på minuter. Blixtbo ansöker först och håller köerna vid liv.
+
+## components/confirm-apply.tsx
+Bekräfta och skicka
+
+## app/hjalp/page.tsx
+Så fungerar Blixtbo, betalning, avslut och radering av uppgifter.
+
+## app/villkor/page.tsx
+Köpvillkor för Blixtbo Premium: pris, uppsägning, ångerrätt och återbetalning.
+
+## app/integritet/page.tsx
+Integritetspolicy för Blixtbo: vilka uppgifter vi sparar, varför, hur länge, och hur du raderar dem.
+Integritet | Blixtbo

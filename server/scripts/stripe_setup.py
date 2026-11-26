@@ -1,7 +1,7 @@
 """Create the Blixtbo Premium product, the monthly price, and the billing webhook.
 
-The price is PREMIUM_PRICE_KR per month (default 99 SEK). The 3-day trial is trial_period_days
-on the subscription, not part of the price and not a coupon. The same script works for a test
+The price is PREMIUM_PRICE_KR per month (default 99 SEK). The subscription has no trial.
+The same script works for a test
 key (sk_test_ or rk_test_) and a live key (sk_live_ or rk_live_). A second run reuses the
 product, the price, and the webhook. Prints ids. Never prints the key.
 """
@@ -42,7 +42,7 @@ def main(stripe_client=None) -> int:
     print(f"STRIPE_PRODUCT_ID={product_id}")
     print(f"STRIPE_PRICE_ID={price_id}")
     print(f"STRIPE_WEBHOOK_ENDPOINT_ID={webhook_id}")
-    print(int(settings.premium_price_kr), "kr/mån efter", int(settings.trial_days), "dagars provperiod.")
+    print(int(settings.premium_price_kr), "kr/mån.")
     print("Webhook:", WEBHOOK_URL)
     return 0
 

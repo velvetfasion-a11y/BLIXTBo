@@ -32,6 +32,9 @@ export function Privacy() {
         <p>
           <span className="font-medium text-ink">Betalningar via Stripe.</span> Kortuppgifter hanteras av Stripe. Blixtbo lagrar inte hela kortnumret. Vi sparar kund- och prenumerationsidentitet hos Stripe, status, period och om en uppsägning är planerad, så att vi vet om Premium är igång.
         </p>
+        <p>
+          <span className="font-medium text-ink">Supportärenden och chatt.</span> När du rapporterar en bugg, kontaktar support eller chattar i appen sparar vi typ, status, e-post, ämne, meddelande och en teknisk bilaga: appversion, sida, webbläsare och ditt användar-id. En skärmbild sparas bara om du bifogar den. En chatt som lämnas till en människa sparas med hela konversationen, även svar från support. Om e-post är inställt meddelas {SUPPORT_EMAIL}. Vi svarar inom 24 timmar.
+        </p>
       </LegalSection>
 
       <LegalSection title="Varför">
@@ -53,7 +56,19 @@ export function Privacy() {
           Du kan begära tillgång, rättelse, radering, begränsning och dataportabilitet, och invända mot behandling som stödjer sig på berättigat intresse. Du kan också klaga hos Integritetsskyddsmyndigheten, imy.se.
         </p>
         <p>
-          Radering gör du själv under Inställningar när du är inloggad. Du skriver RADERA innan något händer. Radera bara Blixtbo-kontot stänger inloggningen. Radera alla uppgifter om mig tar bort profil, ansökningar, meddelanden, hyresvärdarnas inloggningar och loggar som pekar på dig, avslutar prenumerationen och anonymiserar Stripe-kunden. Hur de tre valen skiljer sig beskrivs under Hjälp.
+          Radering gör du själv under Inställningar när du är inloggad. Du skriver RADERA innan något händer. Radera bara Blixtbo-kontot stänger inloggningen och tar bort supportärenden och chattar. Radera alla uppgifter om mig tar bort profil, ansökningar, meddelanden, supportärenden och chattar, hyresvärdarnas inloggningar och loggar som pekar på dig, avslutar prenumerationen och anonymiserar Stripe-kunden. Kopplar du bara bort länkade konton ligger supportärendena kvar. Hur de tre valen skiljer sig beskrivs under Hjälp.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Recensioner">
+        <p>
+          När du har fått en lägenhet kan du lämna ett betyg från 1 till 5 och en valfri text, högst ungefär 1 000 tecken. Vi sparar ditt användar-id, betyget, texten, hyresvärden om den hör till ansökan, tidpunkten och om du samtyckt till att recensionen visas.
+        </p>
+        <p>
+          Samtycket är frivilligt. Kryssar du i att vi får visa recensionen används bara förnamn. Utan den rutan visas recensionen inte för andra. Du kan ändra recensionen efteråt. Det finns en recension per lägenhet du har fått.
+        </p>
+        <p>
+          Recensioner raderas när Blixtbo-kontot raderas, och när du ber om att alla uppgifter om dig raderas. Att bara koppla bort Google, Apple eller en hyresvärd lämnar recensionen kvar, eftersom kontot finns kvar.
         </p>
       </LegalSection>
 

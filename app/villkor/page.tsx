@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Terms } from "@/components/terms";
 
-const description = "Köpvillkor för Blixtbo Premium: pris, provperiod, uppsägning, ångerrätt och återbetalning.";
+const description = "Köpvillkor för Blixtbo Premium: pris, uppsägning, ångerrätt och återbetalning.";
 
 export const metadata: Metadata = {
   title: "Villkor",

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import Link from "next/link";
-import { Button, Sheet } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
-import { premiumPriceKr, trialDays } from "@/lib/billing";
+import { premiumPriceKr } from "@/lib/billing";
+import { Mark } from "@/components/mark";
 import { firebaseAuth, firebaseConfigured } from "@/lib/firebase/client";
 import { usablePublishableKey } from "@/lib/stripe-key";
 import { useStore } from "@/lib/store";
@@ -77,17 +78,56 @@ function PaymentForm({
       <PaymentElement options={{ layout: "tabs", wallets: { applePay: "never", googlePay: "never" } }} />
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       <Button size="lg" className="w-full" disabled={!stripe || busy} onClick={() => void confirm()}>
-        {busy ? "Bekräftar…" : "Starta 3 dagar gratis"}
+        {busy ? "Bekräftar…" : `Betala ${premiumPriceKr()} kr/mån`}
       </Button>
     </div>
   );
 }
 
+const BENEFITS = [
+  "Håller dina köplatser aktiva och förnyar dem.",
+  "Skickar din ansökan med profilen du redan fyllt i, så att du kan bli först till kvarn.",
+  "Bevakar hyresvärdarnas annonser och köer.",
+] as const;
+
+type IapWindow = Window & {
+  webkit?: { messageHandlers?: { blixtboPurchase?: { postMessage: (body: unknown) => void } } };
+};
+
+function appleIap() {
+  if (typeof window === "undefined") return null;
+  return (window as IapWindow).webkit?.messageHandlers?.blixtboPurchase ?? null;
+}
+
 export function Paywall({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
   return (
-    <Sheet open={open} title="Blixtbo Premium" onClose={onClose}>
-      {open ? <PaywallBody onClose={onClose} /> : null}
-    </Sheet>
+    <div className="paywall-fade fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-6">
+      <button type="button" className="absolute inset-0 bg-[#1c1916]/45" aria-label="Stäng" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="premium-title"
+        className="paywall-pop relative max-h-[92dvh] w-full max-w-[420px] overflow-y-auto rounded-[28px] border border-line bg-card px-6 pt-7 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[0_24px_70px_rgba(28,25,22,0.18)] sm:px-8 sm:py-8"
+      >
+        {open ? <PaywallBody onClose={onClose} /> : null}
+      </div>
+    </div>
   );
 }
 
@@ -97,7 +137,6 @@ function PaywallBody({ onClose }: { onClose: () => void }) {
   const [secret, setSecret] = useState("");
   const [intentType, setIntentType] = useState<"setup" | "payment">("setup");
   const [done, setDone] = useState(false);
-  const days = trialDays();
   const price = premiumPriceKr();
   const key = publishableKey();
 
@@ -107,10 +146,9 @@ function PaywallBody({ onClose }: { onClose: () => void }) {
     const { response, data } = await apiFetch("/billing/entitlement");
     if (!response.ok || !data || typeof data !== "object") return;
     const entitlement = data as { plan?: string; status?: string };
-    const reported = entitlement.status === "trialing" ? "active" : entitlement.status;
     store.setBilling({
       plan: entitlement.plan === "premium" ? "premium" : "free",
-      status: reported === "paused" || reported === "canceled" || reported === "active" ? reported : "free",
+      status: entitlement.status === "paused" || entitlement.status === "canceled" || entitlement.status === "active" ? entitlement.status : "free",
       usedAutoApplies: store.billing.usedAutoApplies,
     });
   }
@@ -141,45 +179,82 @@ function PaywallBody({ onClose }: { onClose: () => void }) {
     await refresh();
   }
 
+  function pay() {
+    const native = appleIap();
+    if (native) {
+      native.postMessage({ product: "blixtbo_premium_monthly", priceKr: price });
+      return;
+    }
+    void prepare();
+  }
+
   return (
     <>
       {done ? (
-        <div>
-          <h2 className="font-serif text-[1.7rem] leading-tight tracking-[-0.03em]">Premium är igång</h2>
+        <div className="text-center">
+          <div className="flex justify-center">
+            <Mark size={36} />
+          </div>
+          <h2 id="premium-title" className="mt-4 font-serif text-[1.85rem] leading-tight tracking-[-0.03em]">
+            Premium är igång
+          </h2>
           <p className="mt-3 text-sm leading-relaxed text-soft">
-            {days} dagar gratis, sedan {price} kr/mån. Du kan pausa när du har hittat bostad.
+            {price} kr/mån. Du kan pausa när du har hittat bostad.
           </p>
-          <Button size="lg" className="mt-5 w-full" onClick={onClose}>Tillbaka</Button>
+          <Button size="lg" className="mt-6 w-full" onClick={onClose}>
+            Tillbaka
+          </Button>
         </div>
       ) : (
         <div>
-          <p className="text-sm font-medium text-pine">Betala här i appen</p>
-          <h2 className="mt-2 font-serif text-[1.7rem] leading-tight tracking-[-0.03em]">Ansök utan tak</h2>
-          <p className="mt-3 text-sm leading-relaxed text-soft">
-            Svep gratis. Premium skickar ansökan åt dig. Kort, Apple Pay och Google Pay visas när enheten har dem.
+          <div className="flex justify-center">
+            <Mark size={36} />
+          </div>
+          <h2 id="premium-title" className="mt-4 text-center font-serif text-[1.85rem] leading-[1.15] tracking-[-0.03em]">
+            Missa inte nästa lägenhet
+          </h2>
+          <p className="mt-3 text-center text-sm leading-relaxed text-soft">
+            De bästa lägenheterna försvinner på minuter. Blixtbo ansöker först och håller köerna vid liv.
           </p>
-          <p className="mt-4 font-serif text-4xl tracking-[-0.03em]">
-            {days} dagar<span className="text-base text-soft"> gratis</span>
+          <ul className="mt-5 space-y-2.5">
+            {BENEFITS.map((point) => (
+              <li key={point} className="flex gap-2.5 text-sm leading-5 text-ink">
+                <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-pine" />
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-5 text-center font-serif text-3xl tracking-[-0.03em]">
+            {price} kr<span className="text-base text-soft">/mån</span>
           </p>
-          <p className="mt-1 text-sm text-soft">Sedan {price} kr/mån. Ingen bindningstid.</p>
-          <p className="mt-3 text-sm leading-relaxed text-soft">
-            Genom att starta provperioden godkänner du{" "}
-            <Link href="/villkor" className="font-medium text-ink underline">
+          <p className="mt-3 text-center text-sm leading-relaxed text-soft">
+            Genom att betala godkänner du{" "}
+            <Link href="/villkor" className="font-medium text-ink underline decoration-pine/30 underline-offset-4">
               villkoren
             </Link>
             .
           </p>
-          {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
-          {secret && stripePromise ? (
+          {error ? (
+            <p className="mt-3 text-center text-sm text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {secret && stripePromise && !appleIap() ? (
             <Elements stripe={stripePromise} options={{ clientSecret: secret, appearance }}>
               <PaymentForm intentType={intentType} onSuccess={() => void succeed()} />
             </Elements>
           ) : (
-            <Button size="lg" className="mt-5 w-full" onClick={() => void prepare()}>
-              Lägg till kort
-            </Button>
+            <button
+              type="button"
+              className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-full bg-pine text-base font-medium text-white transition-colors hover:bg-pine-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
+              onClick={pay}
+            >
+              Betala {price} kr/mån
+            </button>
           )}
-          <button type="button" className="mt-3 text-sm text-soft" onClick={onClose}>Inte nu</button>
+          <button type="button" className="mt-4 w-full py-1 text-center text-sm text-soft underline-offset-4 hover:underline" onClick={onClose}>
+            Inte nu
+          </button>
         </div>
       )}
     </>

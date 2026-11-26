@@ -7,7 +7,7 @@ import { IconChevron } from "@/components/icons";
 import { Paywall } from "@/components/paywall";
 import { Button, Sheet, StatusPill } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
-import { premiumPriceKr, trialDays } from "@/lib/billing";
+import { premiumPriceKr } from "@/lib/billing";
 import { firebaseAuth, firebaseConfigured } from "@/lib/firebase/client";
 import { formatLongDate } from "@/lib/format";
 import { useStore } from "@/lib/store";
@@ -36,9 +36,8 @@ function statusCopy(view: SubscriptionView) {
   }
   if (view.status === "paused") return "Premium är pausat. Automatiska ansökningar är av, och inga nya dragningar görs förrän du återupptar.";
   if (view.status === "canceled") return "Prenumerationen är avslutad. Inga fler dragningar görs.";
-  if (view.plan === "premium" && view.trial) return `Premium, provperiod. Därefter ${price} kr i månaden.`;
   if (view.plan === "premium") return `Premium är igång. ${price} kr i månaden.`;
-  return "Gratis. Ett par automatiska ansökningar ingår.";
+  return "Ingen Premium just nu.";
 }
 
 function storeStatus(view: SubscriptionView): Billing["status"] {
@@ -136,7 +135,7 @@ export function SubscriptionManage() {
       <p className="mt-6 text-sm font-medium text-pine">Prenumeration</p>
       <h1 className="mt-2 font-serif text-4xl tracking-[-0.03em]">Blixtbo Premium</h1>
       <p className="mt-3 max-w-md text-sm leading-relaxed text-soft">
-        {trialDays()} dagar gratis, sedan {premiumPriceKr()} kr i månaden. Ingen bindningstid. Om du avslutar behåller du Premium tills perioden tar slut. Därefter blir kontot gratis, och inga fler dragningar görs. Du kan ångra avslutet innan dess.
+        {premiumPriceKr()} kr i månaden. Ingen bindningstid. Om du avslutar behåller du Premium tills perioden tar slut. Därefter görs inga fler dragningar. Du kan ångra avslutet innan dess.
       </p>
 
       <section className="mt-8 rounded-3xl border border-line bg-card px-4 py-4">
@@ -145,7 +144,7 @@ export function SubscriptionManage() {
           {current.cancelAtPeriodEnd ? <StatusPill tone="gold">Avslutas</StatusPill> : null}
           {current.status === "paused" ? <StatusPill tone="info">Pausad</StatusPill> : null}
           {current.plan === "premium" && current.status === "active" && !current.cancelAtPeriodEnd ? <StatusPill tone="pine">Aktiv</StatusPill> : null}
-          {current.plan !== "premium" ? <StatusPill tone="ink">Gratis</StatusPill> : null}
+          {current.plan !== "premium" ? <StatusPill tone="ink">Utan Premium</StatusPill> : null}
         </div>
         {loading ? <p className="mt-3 text-sm text-soft">Hämtar prenumeration…</p> : <p className="mt-3 text-sm leading-relaxed text-soft">{statusCopy(current)}</p>}
         {!signedIn ? (

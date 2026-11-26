@@ -1,17 +1,53 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ConnectSheet } from "@/components/connect-sheet";
 import { CustomLandlords } from "@/components/custom-landlords";
 import { LandlordLogo } from "@/components/landlord-logo";
 import { IconChevron } from "@/components/icons";
 import { Button, PrivacyNote, cx } from "@/components/ui";
+import { formatDayMonth } from "@/lib/format";
+import { cloudReady, putJson } from "@/lib/landlord-cloud";
 import { useStore } from "@/lib/store";
+import type { Connection } from "@/lib/types";
+
+const FEE_SOURCES = new Set(["bostadsformedlingen", "uppsala", "boplats", "boplatssyd"]);
+
+function keepaliveLine(link: Connection | undefined): string | null {
+  if (!link?.keepaliveState || link.keepaliveState === "skipped" || link.keepaliveState === "dry_run") return null;
+  if (link.keepaliveCode === "password_changed") return "Behöver nytt lösenord";
+  if (link.keepaliveState === "ok") {
+    return link.lastKeptAliveAt ? `Hålls aktiv · senast ${formatDayMonth(link.lastKeptAliveAt)}` : "Hålls aktiv";
+  }
+  if (link.keepaliveState === "fee_due") {
+    return link.feeDueAt ? `Betala köavgiften före ${formatDayMonth(link.feeDueAt)}` : null;
+  }
+  if (link.keepaliveState === "paused") return "Pausad – kräver Premium";
+  if (link.keepaliveState === "needs_user" || link.keepaliveState === "needs_bankid") {
+    return link.keepaliveNotice || "Behöver dig";
+  }
+  return null;
+}
 
 export function Connections() {
   const store = useStore();
-  const [sheet, setSheet] = useState<{ id: string; intent: "login" | "signup" } | null>(null);
+  const params = useSearchParams();
+  const querySource = params.get("source");
+  const intentParam = params.get("intent");
+  const requested: { id: string; intent: "login" | "signup" } | null =
+    querySource && (intentParam === "login" || intentParam === "signup") ? { id: querySource, intent: intentParam } : null;
+  const requestKey = requested ? `${requested.id}:${requested.intent}` : "";
+  const [sheet, setSheet] = useState(requested);
+  const [seenRequest, setSeenRequest] = useState(requestKey);
+
+  if (requestKey && requestKey !== seenRequest) {
+    setSeenRequest(requestKey);
+    setSheet(requested);
+  } else if (!requestKey && seenRequest) {
+    setSeenRequest("");
+  }
 
   useEffect(() => {
     document.title = "Hyresvärdar · Blixtbo";
@@ -39,7 +75,23 @@ export function Connections() {
           const link = store.connections[source.id];
           const on = link?.status === "connected";
           const waiting = link?.status === "pending" || link?.status === "needs_user" || link?.status === "needs_bankid";
-          const label = on ? "Kopplad" : link?.status === "needs_bankid" ? "BankID behövs" : link?.status === "needs_user" ? "Kräver dig" : link?.status === "pending" ? "Väntar" : "Inte kopplad";
+          const needsPassword = link?.keepaliveCode === "password_changed";
+          const paused = link?.keepaliveState === "paused";
+          const label = needsPassword
+            ? "Behöver nytt lösenord"
+            : paused
+              ? "Pausad – kräver Premium"
+              : on
+                ? "Kopplad"
+                : link?.status === "needs_bankid"
+                  ? "BankID behövs"
+                  : link?.status === "needs_user"
+                    ? "Kräver dig"
+                    : link?.status === "pending"
+                      ? "Väntar"
+                      : "Inte kopplad";
+          const line = keepaliveLine(link);
+          const fee = link?.keepaliveStrategy === "fee_reminder" || FEE_SOURCES.has(source.id);
           return (
             <li key={source.id} className="rounded-3xl border border-line bg-card p-4">
               <div className="flex items-start justify-between gap-3">
@@ -49,6 +101,7 @@ export function Connections() {
                     <p className="text-xs text-soft">{source.kind}</p>
                     <h2 className="mt-1 text-lg font-semibold tracking-tight">{source.name}</h2>
                     <p className="mt-1 text-sm leading-relaxed text-soft">{source.blurb}</p>
+                    {line ? <p className="mt-2 text-sm text-ink">{line}</p> : null}
                   </div>
                 </div>
                 <span className={cx("shrink-0 rounded-full px-2.5 py-1 text-xs font-medium", on ? "bg-pine-soft text-pine-deep" : waiting ? "bg-paper-deep text-clay" : "bg-paper-deep text-soft")}>
@@ -72,13 +125,16 @@ export function Connections() {
               ) : (
                 <div className="mt-4 flex gap-2">
                   <Button size="sm" onClick={() => setSheet({ id: source.id, intent: "login" })}>
-                    Logga in
+                    {needsPassword ? "Uppdatera lösenord" : "Logga in"}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => setSheet({ id: source.id, intent: "signup" })}>
                     Skapa konto
                   </Button>
                 </div>
               )}
+              {fee && (on || waiting) ? (
+                <FeeDate sourceId={source.id} value={link?.feeDueAt} focus={params.get("fee") === "1" && params.get("source") === source.id} />
+              ) : null}
             </li>
           );
         })}
@@ -93,5 +149,56 @@ export function Connections() {
         />
       ) : null}
     </div>
+  );
+}
+
+function FeeDate({ sourceId, value, focus }: { sourceId: string; value?: string | null; focus: boolean }) {
+  const incoming = value ? value.slice(0, 10) : "";
+  const [date, setDate] = useState(incoming);
+  const [seenValue, setSeenValue] = useState(incoming);
+  const [message, setMessage] = useState("");
+
+  if (incoming !== seenValue) {
+    setSeenValue(incoming);
+    setDate(incoming);
+  }
+
+  async function save() {
+    setMessage("");
+    if (!cloudReady()) {
+      setMessage("Logga in för att spara datumet.");
+      return;
+    }
+    try {
+      await putJson(`/connections/${sourceId}/fee-due`, { date });
+      setMessage("Sparat. Vi påminner dig.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Kunde inte spara.");
+    }
+  }
+
+  return (
+    <form
+      className="mt-4 flex flex-wrap items-end gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save();
+      }}
+    >
+      <label className="text-sm text-soft">
+        Köavgift förfaller
+        <input
+          type="date"
+          value={date}
+          autoFocus={focus}
+          onChange={(event) => setDate(event.target.value)}
+          className="mt-1 block rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink"
+        />
+      </label>
+      <Button size="sm" type="submit">
+        Spara
+      </Button>
+      {message ? <p className="text-sm text-soft">{message}</p> : null}
+    </form>
   );
 }

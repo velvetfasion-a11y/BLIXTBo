@@ -40,7 +40,7 @@ def _site(source_id: str) -> dict:
     return SITES[source_id]
 
 
-def _login(client: httpx.Client, source_id: str, secret: dict, guard: SiteGuard | None) -> StepResult:
+def _login(client: httpx.Client, source_id: str, secret: dict, guard: SiteGuard | None, *, keepalive: bool = False) -> StepResult:
     site = _site(source_id)
     name = site["name"]
     page_url = site["origin"] + site["login_path"]
@@ -48,6 +48,10 @@ def _login(client: httpx.Client, source_id: str, secret: dict, guard: SiteGuard 
         page = request(client, "GET", page_url, guard, follow_redirects=False)
     except RobotsBlocked:
         return paused("captcha", f"{name} tillåter inte anropet", f"Robots.txt spärrar inloggningen hos {name}. Inget skickades.")
+    if keepalive and page.status_code >= 500:
+        return paused("unreachable", f"Vi når inte {name} just nu", "Vi försöker igen senare.")
+    if keepalive and page.status_code == 429:
+        return paused("rate_limited", f"{name} vill att du tar över", f"{name} ber oss vänta. Vi försöker inte igen nu.")
     if captcha(page.status_code, page.text):
         return paused("captcha", f"{name} vill att du tar över", f"{name} visar en kontroll. Vi försöker inte igen. Inget lösenord skickades.")
     if not has_field(page.text, USER_FIELD) or not has_field(page.text, PASS_FIELD):
@@ -68,6 +72,10 @@ def _login(client: httpx.Client, source_id: str, secret: dict, guard: SiteGuard 
         )
     except RobotsBlocked:
         return paused("captcha", f"{name} tillåter inte anropet", "Robots.txt spärrar inloggningen. Inget skickades.")
+    if keepalive and sent.status_code >= 500:
+        return paused("unreachable", f"Vi når inte {name} just nu", "Vi försöker igen senare.")
+    if keepalive and sent.status_code == 429:
+        return paused("rate_limited", f"{name} vill att du tar över", f"{name} ber oss vänta. Vi försöker inte igen nu.")
     if captcha(sent.status_code, sent.text):
         return paused("captcha", f"{name} vill att du tar över", f"{name} visar en kontroll efter inloggningen. Vi försöker inte igen.")
     kind = classify_html(sent.status_code, sent.text)
@@ -159,6 +167,28 @@ def apply(client: httpx.Client, source_id: str, secret: dict, payload: dict, gua
 
 def renew(client: httpx.Client, source_id: str, secret: dict, payload: dict, guard: SiteGuard | None = None) -> StepResult:
     return _login(client, source_id, secret, guard)
+
+
+def keepalive(client: httpx.Client, source_id: str, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+    """Password login, then one GET of the Mina sidor start page. No interest form."""
+    signed = _login(client, source_id, secret, guard, keepalive=True)
+    if not signed.ok:
+        return signed
+    site = _site(source_id)
+    name = site["name"]
+    try:
+        page = request(client, "GET", site["origin"] + "/", guard, follow_redirects=False)
+    except RobotsBlocked:
+        return paused("captcha", f"{name} vill att du tar över", "Robots.txt spärrar sidan. Inget mer skickades.")
+    except httpx.TransportError:
+        return paused("unreachable", f"Vi når inte {name} just nu", "Vi försöker igen senare.")
+    if page.status_code >= 500:
+        return paused("unreachable", f"Vi når inte {name} just nu", "Vi försöker igen senare.")
+    if page.status_code == 429:
+        return paused("rate_limited", f"{name} vill att du tar över", f"{name} ber oss vänta. Vi försöker inte igen nu.")
+    if captcha(page.status_code, page.text):
+        return paused("captcha", f"{name} vill att du tar över", f"{name} visar en kontroll. Vi försöker inte igen.")
+    return finished(f"{name} är kollat", f"Inloggningen hos {name} fungerar.", "queue_ok")
 
 
 def session(client: httpx.Client, source_id: str, cookie: str, kind: str, payload: dict, guard: SiteGuard | None = None) -> StepResult:
