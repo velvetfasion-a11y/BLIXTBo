@@ -8,6 +8,7 @@
     "start": "next start -H 0.0.0.0 -p 43123",
     "lint": "eslint",
     "test:rules": "firebase emulators:exec --only firestore --project blixtbo-rules \"node tests/firestore.rules.test.mjs\"",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:qasa": "node --experimental-strip-types --test tests/qasa-message.test.ts",
     "pack": "node scripts/pack-html.mjs blixtbo.html"
   },

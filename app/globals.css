@@ -107,9 +107,21 @@
   animation: pulse-ring 1.6s ease-out infinite;
 }
 
+.swipe-move {
+  transition: transform 0.28s ease;
+}
+
+.swipe-move.is-dragging {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .enter,
   .pulse-ring {
     animation: none;
+  }
+
+  .swipe-move {
+    transition: none;
   }
 }
