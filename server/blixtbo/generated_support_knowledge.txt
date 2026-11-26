@@ -184,8 +184,9 @@ Bevakning och ansökningar upp till ett tak.
 kr per månad efter dagars provperiod.
 
 ## components/landing.tsx
-relative hidden overflow-hidden bg-[#e7e0d4] lg:block
-Vardagsrum i en lägenhet på Södermalm
+Nya annonser från hyresvärdarna, samlade efter område, hyra och storlek.
+En profil räcker. Ett svep skickar ansökan innan de andra hunnit läsa klart.
+Ködagar och en påminnelse när en kö behöver förnyas.
 
 ## components/connections.tsx
 Behöver nytt lösenord
