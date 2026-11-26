@@ -2,8 +2,8 @@ import Link from "next/link";
 import { FaqList } from "@/components/faq-list";
 import { SiteFooter } from "@/components/site-footer";
 import { Wordmark } from "@/components/mark";
-import { SellerIdentity } from "@/components/seller";
 import { premiumPriceKr, trialDays } from "@/lib/billing";
+import { SUPPORT_EMAIL } from "@/lib/company";
 
 export function Help() {
   const days = trialDays();
@@ -94,8 +94,13 @@ export function Help() {
         <section className="mt-10">
           <h2 className="font-serif text-2xl tracking-[-0.03em]">Kontakt</h2>
           <div className="mt-4 space-y-4 text-sm leading-relaxed text-soft">
-            <p>Frågor om betalning, kontot eller dina uppgifter.</p>
-            <SellerIdentity />
+            <p>
+              Frågor om betalning, kontot eller dina uppgifter skickar du till{" "}
+              <a className="font-medium text-ink" href={`mailto:${SUPPORT_EMAIL}`}>
+                {SUPPORT_EMAIL}
+              </a>
+              .
+            </p>
           </div>
         </section>
       </div>

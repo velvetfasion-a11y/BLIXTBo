@@ -1,6 +1,5 @@
 import { LegalPage, LegalSection } from "@/components/legal-page";
-import { SellerIdentity } from "@/components/seller";
-import { SUPPORT_EMAIL } from "@/lib/company";
+import { COMPANY_NAME, ORG_NR, SUPPORT_EMAIL } from "@/lib/company";
 
 export function Privacy() {
   return (
@@ -10,8 +9,14 @@ export function Privacy() {
       intro="Så behandlar Blixtbo personuppgifter enligt dataskyddsförordningen (GDPR)."
     >
       <LegalSection title="Personuppgiftsansvarig">
-        <SellerIdentity />
-        <p>Rensé Advisory är personuppgiftsansvarig för behandlingen i Blixtbo.</p>
+        <p>{COMPANY_NAME} är personuppgiftsansvarig för behandlingen i Blixtbo.</p>
+        {ORG_NR ? <p>Org.nr {ORG_NR}</p> : null}
+        <p>
+          E-post:{" "}
+          <a className="font-medium text-ink" href={`mailto:${SUPPORT_EMAIL}`}>
+            {SUPPORT_EMAIL}
+          </a>
+        </p>
       </LegalSection>
 
       <LegalSection title="Vilka uppgifter">
