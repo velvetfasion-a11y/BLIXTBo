@@ -4,14 +4,10 @@ import { useState } from "react";
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Button, Sheet } from "@/components/ui";
+import { apiFetch } from "@/lib/api";
 import { premiumPriceKr, trialDays } from "@/lib/billing";
 import { firebaseAuth, firebaseConfigured } from "@/lib/firebase/client";
 import { useStore } from "@/lib/store";
-import type { Billing } from "@/lib/types";
-
-function apiBase() {
-  return (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/$/, "");
-}
 
 function publishableKey() {
   const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
@@ -21,15 +17,9 @@ function publishableKey() {
 const stripePromise: Promise<Stripe | null> | null = publishableKey() ? loadStripe(publishableKey()) : null;
 
 async function postBilling(path: string) {
-  const user = firebaseConfigured() ? firebaseAuth().currentUser : null;
-  const token = user ? await user.getIdToken() : "";
-  const response = await fetch(`${apiBase()}${path}`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  const data = await response.json().catch(() => ({}));
+  const { response, data, detail } = await apiFetch(path, { method: "POST" });
   if (!response.ok) {
-    throw new Error(typeof data.detail === "string" ? data.detail : "Betalningen gick inte att starta.");
+    throw new Error(detail || "Betalningen gick inte att starta.");
   }
   return data as { clientSecret?: string; intentType?: "setup" | "payment"; status?: string };
 }
@@ -113,13 +103,12 @@ function PaywallBody({ onClose }: { onClose: () => void }) {
   async function refresh() {
     const user = firebaseConfigured() ? firebaseAuth().currentUser : null;
     if (!user) return;
-    const token = await user.getIdToken();
-    const response = await fetch(`${apiBase()}/billing/entitlement`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!response.ok) return;
-    const data = await response.json();
+    const { response, data } = await apiFetch("/billing/entitlement");
+    if (!response.ok || !data || typeof data !== "object") return;
+    const entitlement = data as { plan?: string; status?: string };
     store.setBilling({
-      plan: data.plan === "premium" ? "premium" : "free",
-      status: data.status === "paused" || data.status === "canceled" || data.status === "active" ? data.status : "free",
+      plan: entitlement.plan === "premium" ? "premium" : "free",
+      status: entitlement.status === "paused" || entitlement.status === "canceled" || entitlement.status === "active" ? entitlement.status : "free",
       usedAutoApplies: store.billing.usedAutoApplies,
     });
   }
@@ -212,22 +201,5 @@ export function useBillingActions() {
     }
   }
 
-  async function cancel() {
-    setError("");
-    try {
-      await postBilling("/billing/cancel");
-      store.setBilling({ ...store.billing, plan: "free", status: "canceled" });
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Gick inte att avsluta.");
-    }
-  }
-
-  return { error, pause, resume, cancel };
-}
-
-export function billingLabel(billing: Billing) {
-  if (billing.status === "paused") return "Premium är pausat. Automatiska ansökningar är av.";
-  if (billing.status === "canceled") return "Prenumerationen är avslutad.";
-  if (billing.plan === "premium" && billing.status === "active") return "Premium. Ansökningar går utan tak.";
-  return "Gratis. Ett par automatiska ansökningar ingår.";
+  return { error, pause, resume };
 }

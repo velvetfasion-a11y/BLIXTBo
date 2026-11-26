@@ -14,6 +14,12 @@ export function formatDate(iso: string) {
   }).format(date);
 }
 
+export function formatLongDate(iso: string) {
+  const date = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("sv-SE", { day: "numeric", month: "long", year: "numeric" }).format(date);
+}
+
 export function formatDayMonth(iso: string) {
   const date = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
   return new Intl.DateTimeFormat("sv-SE", {

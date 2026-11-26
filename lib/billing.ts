@@ -23,6 +23,13 @@ export function emptyBilling(): Billing {
   return { plan: "free", status: "free", usedAutoApplies: 0 };
 }
 
+export function billingLabel(billing: Billing) {
+  if (billing.status === "paused") return "Premium är pausat. Automatiska ansökningar är av.";
+  if (billing.status === "canceled") return "Prenumerationen är avslutad.";
+  if (billing.plan === "premium" && billing.status === "active") return "Premium. Ansökningar går utan tak.";
+  return "Gratis. Ett par automatiska ansökningar ingår.";
+}
+
 /** Premium that is not paused may auto-apply without a cap. A pause turns it off. */
 export function canAutoApply(billing: Billing, freeLimit = freeAutoApplyLimit()) {
   if (billing.status === "paused") return false;

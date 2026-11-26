@@ -4,6 +4,7 @@ import {
   getAdditionalUserInfo,
   getRedirectResult,
   signInWithCredential,
+  reauthenticateWithPopup,
   signInWithPopup,
   signInWithRedirect,
   signOut,
@@ -139,4 +140,21 @@ export function takeGoogleRedirectResult() {
 export async function signOutGoogle() {
   if (!firebaseConfigured()) return;
   await signOut(firebaseAuth());
+}
+
+/** Fresh popup sign-in when Firebase requires a recent login. Nothing is changed if the popup is closed. */
+export async function reauthenticate() {
+  if (!firebaseConfigured()) throw new Error("Firebase är inte konfigurerat.");
+  const user = firebaseAuth().currentUser;
+  if (!user) throw new Error("Logga in igen.");
+  const ids = user.providerData.map((item) => item.providerId);
+  if (ids.includes("google.com")) {
+    await reauthenticateWithPopup(user, googleProvider());
+    return;
+  }
+  if (ids.includes("apple.com")) {
+    await reauthenticateWithPopup(user, appleProvider());
+    return;
+  }
+  throw new Error("Logga ut och in igen, och upprepa sedan valet.");
 }
