@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApplicationLimitSheet } from "@/components/application-limit";
 import { canAutoApply } from "@/lib/billing";
-import { ConfirmApply } from "@/components/confirm-apply";
+import { ConfirmApply, ConfirmSend } from "@/components/confirm-apply";
 import { Paywall } from "@/components/paywall";
 import { QueueNudge } from "@/components/queue-nudge";
 import { Countdown } from "@/components/countdown";
@@ -12,6 +12,7 @@ import { ConnectSheet } from "@/components/connect-sheet";
 import { EmptyState, StatusPill } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDateTime, freshness, kr, rokShort } from "@/lib/format";
+import { sendConfirmation } from "@/lib/landlord-api";
 import { atApplicationLimit } from "@/lib/limits";
 import { assess, passesFilters } from "@/lib/profile";
 import { useStore } from "@/lib/store";
@@ -24,6 +25,7 @@ export function Feed() {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [limitId, setLimitId] = useState<string | null>(null);
   const [paywall, setPaywall] = useState(false);
+  const [sendId, setSendId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Hem · Blixtbo";
@@ -111,6 +113,11 @@ export function Feed() {
                     setConfirmId(listing.id);
                     return false;
                   }
+                  const source = store.sources.find((item) => item.id === listing.sourceId);
+                  if (sendConfirmation(source, listing)) {
+                    setSendId(listing.id);
+                    return false;
+                  }
                   return true;
                 }}
                 onApply={(id) => store.apply(id)}
@@ -142,8 +149,33 @@ export function Feed() {
         listing={store.listings.find((item) => item.id === confirmId) ?? null}
         onClose={() => setConfirmId(null)}
         onSend={() => {
-          if (confirmId) store.apply(confirmId);
+          if (!confirmId) return;
+          const listing = store.listings.find((item) => item.id === confirmId);
+          const source = store.sources.find((item) => item.id === listing?.sourceId);
+          const text = sendConfirmation(source, listing);
+          if (text) {
+            setSendId(confirmId);
+            setConfirmId(null);
+            return;
+          }
+          store.apply(confirmId);
           setConfirmId(null);
+        }}
+      />
+      <ConfirmSend
+        open={Boolean(sendId)}
+        title="Bekräfta innan något skickas"
+        body={sendConfirmation(
+          store.sources.find((item) => item.id === store.listings.find((listing) => listing.id === sendId)?.sourceId),
+          store.listings.find((listing) => listing.id === sendId),
+        ) || ""}
+        onClose={() => setSendId(null)}
+        onSend={() => {
+          const listing = store.listings.find((item) => item.id === sendId);
+          const source = store.sources.find((item) => item.id === listing?.sourceId);
+          const text = sendConfirmation(source, listing);
+          if (sendId && text) store.apply(sendId, { confirmation: text });
+          setSendId(null);
         }}
       />
     </div>

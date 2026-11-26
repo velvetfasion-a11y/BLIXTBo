@@ -10,10 +10,10 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy.orm import Session
 
-from blixtbo import landlords
+from blixtbo import crypto, landlords, public_listings
 from blixtbo.config import settings
 from blixtbo.db import init_db, session
-from blixtbo.jobs import accept_approval, session_cookie_from_body
+from blixtbo.jobs import accept_approval, build_apply_payload, credentials_from_body, session_cookie_from_body
 from blixtbo.billing import client_secret_from_subscription, entitlement_from_event, firebase_uid_from_event, is_stripe_test_key, price_lookup_key, price_ore
 from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
@@ -444,6 +444,8 @@ def match(body: dict, user: User = Depends(require_user)) -> dict:
 
 @app.post("/connections/{source_id}/approve")
 def approve(source_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    if landlords.landlord(source_id) is None:
+        raise HTTPException(status_code=404, detail="Den hyresvärden finns inte.")
     method = str(body.get("method") or user.auth_method)
     purpose = str(body.get("purpose") or "create_account")
     accept_approval(db, user, source_id, method, purpose)
@@ -451,15 +453,49 @@ def approve(source_id: str, body: dict, user: User = Depends(require_user), db: 
     return {"queued": True, "source_id": source_id}
 
 
+@app.post("/connections/{source_id}/credentials")
+def save_credentials(source_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    """Seal the password with the worker public key. This process cannot open it."""
+    site = landlords.landlord(source_id)
+    if site is None or not site.accepts_password:
+        raise HTTPException(status_code=400, detail="Den här hyresvärden tar inte emot ett lösenord här.")
+    try:
+        secret = credentials_from_body(body)
+        sealed = crypto.seal_credentials(secret)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Inloggningen kan inte sparas just nu.")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Skriv användarnamn och lösenord. BankID tas inte emot.")
+    secret["password"] = ""
+    db.add(Job(user_id=user.id, source_id=source_id, kind="store_credentials", payload=json.dumps({"sealed": sealed})))
+    db.commit()
+    return {"queued": True, "source_id": source_id}
+
+
+@app.post("/connections/{source_id}/resume")
+def resume_connection(source_id: str, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    if landlords.landlord(source_id) is None:
+        raise HTTPException(status_code=404, detail="Den hyresvärden finns inte.")
+    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id=source_id).one_or_none()
+    if login is None or not login.secret_ciphertext:
+        raise HTTPException(status_code=409, detail="Ingen inloggning är sparad.")
+    db.add(Job(user_id=user.id, source_id=source_id, kind="renew", payload=json.dumps({"source_id": source_id})))
+    db.commit()
+    return {"queued": True, "source_id": source_id}
+
+
 @app.post("/connections/{source_id}/session")
 def save_session(source_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
-    if not landlords.requires_bankid(source_id):
-        raise HTTPException(status_code=400, detail="Den här hyresvärden kräver inte BankID.")
+    if not landlords.accepts_cookie(source_id):
+        raise HTTPException(status_code=400, detail="Den här hyresvärden tar inte emot en session.")
     try:
         cookie = session_cookie_from_body(body)
+        sealed = crypto.seal_cookie(cookie)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Sessionen kan inte sparas just nu.")
     except ValueError:
         raise HTTPException(status_code=400, detail="Bara hyresvärdens session tas emot. BankID sparas inte.")
-    db.add(Job(user_id=user.id, source_id=source_id, kind="store_session", payload=json.dumps({"cookie": cookie})))
+    db.add(Job(user_id=user.id, source_id=source_id, kind="store_session", payload=json.dumps({"sealed": sealed})))
     db.commit()
     return {"queued": True, "source_id": source_id}
 
@@ -473,16 +509,56 @@ def list_connections(user: User = Depends(require_user), db: Session = Depends(g
 @app.get("/notices")
 def list_notices(user: User = Depends(require_user), db: Session = Depends(get_db)) -> list:
     rows = db.query(Notice).filter_by(user_id=user.id).order_by(Notice.created_at.desc()).limit(50).all()
-    return [{"kind": row.kind, "title": row.title, "body": row.body, "read": row.read} for row in rows]
+    return [
+        {
+            "id": row.id,
+            "kind": row.kind,
+            "title": row.title,
+            "body": row.body,
+            "read": row.read,
+            "at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in rows
+    ]
+
+
+@app.get("/listings")
+def listings(request: Request, user: User = Depends(require_user)) -> dict:
+    filters = {
+        "areas": [part for part in (request.query_params.get("areas") or "").split(",") if part],
+        "max_rent": request.query_params.get("max_rent") or "",
+        "rooms": request.query_params.get("rooms") or "any",
+        "min_sqm": request.query_params.get("min_sqm") or "",
+        "min_floor": request.query_params.get("min_floor") or "",
+    }
+    client = public_listings_client()
+    try:
+        rows = public_listings.collect(client, filters)
+    finally:
+        client.close()
+    return {"listings": [public_listings.to_listing(row) for row in rows]}
+
+
+def public_listings_client():
+    factory = getattr(landlords, "_client_factory", None)
+    if factory is not None:
+        return factory("listings")
+    return httpx.Client(timeout=20.0, follow_redirects=False)
 
 
 @app.post("/listings/{listing_id}/apply")
 def apply(listing_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
     source_id = str(body.get("source_id") or "")
+    site = landlords.landlord(source_id)
+    if site is None:
+        raise HTTPException(status_code=404, detail="Den hyresvärden finns inte.")
     login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id=source_id, status="active").one_or_none()
     if login is None:
         raise HTTPException(status_code=409, detail="Kontot är inte kopplat.")
-    db.add(Job(user_id=user.id, source_id=source_id, kind="apply", payload="{}"))
+    payload = build_apply_payload(listing_id, body)
+    if (site.binding_apply or site.message_apply) and not payload.get("confirmed"):
+        raise HTTPException(status_code=409, detail="Bekräfta i appen innan något skickas.")
+    db.add(Job(user_id=user.id, source_id=source_id, kind="apply", payload=json.dumps(payload, ensure_ascii=False)))
     db.commit()
     return {"queued": True, "listing_id": listing_id}
 

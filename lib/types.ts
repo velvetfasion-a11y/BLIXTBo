@@ -81,6 +81,15 @@ export type Listing = {
   incomeMultiple: number;
   active: boolean;
   sourceName?: string;
+  externalId?: string;
+  listingUrl?: string;
+  bindingApply?: boolean;
+  messageApply?: boolean;
+  objectAdId?: string;
+  lagenhetId?: string;
+  annonsId?: string;
+  refid?: string;
+  qasaId?: string;
   manualApply?: boolean;
   applyUrl?: string;
   rankScore?: number;
@@ -111,6 +120,14 @@ export type Source = {
   health: SourceHealth;
   enabled: boolean;
   requiresBankId: boolean;
+  automated?: boolean;
+  passwordLogin?: boolean;
+  canCreate?: boolean;
+  acceptsCookie?: boolean;
+  bindingApply?: boolean;
+  messageApply?: boolean;
+  loginUrl?: string;
+  usernameLabel?: string;
   applicationLimit?: number | null;
   plusLimit?: number | null;
   plusPriceKr?: number | null;
@@ -119,8 +136,9 @@ export type Source = {
 
 export type Connection = {
   sourceId: string;
-  status: "connected" | "none";
+  status: "connected" | "none" | "pending" | "needs_user" | "needs_bankid";
   email?: string;
+  detail?: string;
   connectedAt?: string;
   bankIdSession?: boolean;
 };

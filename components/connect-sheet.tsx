@@ -5,6 +5,7 @@ import { IconCheck } from "@/components/icons";
 import { SourceMark } from "@/components/source-mark";
 import { Button, PrivacyNote, Sheet, cx } from "@/components/ui";
 import { kr, parseMoney } from "@/lib/format";
+import { cloudReady, postJson } from "@/lib/landlord-api";
 import { assess } from "@/lib/profile";
 import { useStore } from "@/lib/store";
 import type { Listing } from "@/lib/types";
@@ -40,6 +41,11 @@ export function ConnectSheet({
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.profile.phone ?? "");
   const [income, setIncome] = useState(user?.profile.monthlyIncome ? String(user.profile.monthlyIncome) : "");
+  const [username, setUsername] = useState(user?.email ?? "");
+  const [password, setPassword] = useState("");
+  const [cookie, setCookie] = useState("");
+  const [error, setError] = useState("");
+  const real = Boolean(source?.automated && user && !user.demo && cloudReady());
 
   function saveDetails() {
     store.updateAccount({
@@ -64,21 +70,78 @@ export function ConnectSheet({
     setStep("done");
   }
 
-  function approve() {
-    if (!sourceId || phase !== "idle") return;
+  async function approve() {
+    if (!sourceId || phase !== "idle" || !source) return;
     store.dismissToast();
+    setError("");
+    if (!real) {
+      setPhase("wait");
+      window.setTimeout(() => {
+        if (source.requiresBankId) {
+          setPhase("idle");
+          setStep("bankid");
+          return;
+        }
+        finishConnect(false);
+      }, 1300);
+      return;
+    }
+    if (source.requiresBankId && !source.passwordLogin) {
+      setStep("bankid");
+      return;
+    }
+    if (mode === "create" && !source.canCreate) {
+      setMode("existing");
+      setError(`Skapa kontot hos ${source.name} själv. Logga sedan in här med det lösenordet.`);
+      return;
+    }
     setPhase("wait");
-    window.setTimeout(() => {
-      if (source?.requiresBankId) {
-        setPhase("idle");
-        setStep("bankid");
-        return;
+    try {
+      if (mode === "existing" && source.passwordLogin) {
+        if (!username.trim() || !password) {
+          setPhase("idle");
+          setError("Skriv användarnamn och lösenord.");
+          return;
+        }
+        await postJson(`/connections/${sourceId}/credentials`, { username: username.trim(), password });
+        setPassword("");
+      } else {
+        await postJson(`/connections/${sourceId}/approve`, { purpose: "create_account", method: user?.method || "google" });
       }
-      finishConnect(false);
-    }, 1300);
+      setPhase("done");
+      setStep("done");
+      void store.refreshLandlord();
+    } catch (caught) {
+      setPhase("idle");
+      setError(caught instanceof Error ? caught.message : "Kopplingen gick inte att köa.");
+    }
   }
 
-  function openBankId() {
+  async function saveSession() {
+    if (!sourceId || phase !== "idle" || !source) return;
+    setError("");
+    if (!real) {
+      openDemoBankId();
+      return;
+    }
+    if (!cookie.trim()) {
+      setError("Klistra in sessionen från hyresvärden.");
+      return;
+    }
+    setPhase("wait");
+    try {
+      await postJson(`/connections/${sourceId}/session`, { cookie: cookie.trim() });
+      setCookie("");
+      setPhase("done");
+      setStep("done");
+      void store.refreshLandlord();
+    } catch (caught) {
+      setPhase("idle");
+      setError(caught instanceof Error ? caught.message : "Sessionen gick inte att spara.");
+    }
+  }
+
+  function openDemoBankId() {
     if (!sourceId || phase !== "idle") return;
     setPhase("wait");
     const link = document.createElement("a");
@@ -229,9 +292,21 @@ export function ConnectSheet({
                 ) : null}
               </div>
             </section>
+          ) : source.passwordLogin && real ? (
+            <div className="space-y-3">
+              <MiniField label={source.usernameLabel || `E-post hos ${source.name}`} value={username} onChange={setUsername} />
+              <MiniField label="Lösenord" value={password} onChange={setPassword} secret />
+              <p className="text-sm leading-relaxed text-soft">Lösenordet krypteras innan det sparas. Blixtbo skapar inget nytt konto.</p>
+            </div>
           ) : (
             <MiniField label={`E-post hos ${source.name}`} value={email} onChange={setEmail} />
           )}
+          {mode === "create" && source.id === "homeq" ? (
+            <p className="text-sm leading-relaxed text-soft">
+              Ett godkännande här är ditt ja till HomeQ:s villkor. Sedan behöver du bekräfta e-posten från HomeQ och verifiera dig med BankID hos HomeQ.
+            </p>
+          ) : null}
+          {error ? <p className="text-sm leading-relaxed text-clay">{error}</p> : null}
 
           {listing ? <MatchNote listing={listing} /> : null}
           <button
@@ -296,12 +371,37 @@ export function ConnectSheet({
             <p>BankID ska visa {source.name}. Godkänn bara om det namnet står där.</p>
             <p>Godkänn aldrig en BankID-förfrågan du inte själv har startat.</p>
           </div>
-          <Button size="lg" className="w-full" disabled={phase !== "idle"} onClick={openBankId}>
-            {phase === "wait" ? "Öppnar BankID…" : "Öppna BankID"}
-          </Button>
-          <p className="text-sm leading-relaxed text-soft">
-            Knappen öppnar BankID på den här enheten, för inloggningen hos {source.name}.
-          </p>
+          {real ? (
+            <>
+              <a href={source.loginUrl || "#"} target="_blank" rel="noreferrer" className="inline-flex text-sm font-medium text-pine">
+                Öppna {source.name} och logga in
+              </a>
+              <label className="block text-sm">
+                <span className="text-soft">Session från {source.name}</span>
+                <textarea
+                  value={cookie}
+                  onChange={(event) => setCookie(event.target.value)}
+                  className="mt-1 h-24 w-full rounded-2xl border border-line bg-card px-3 py-2 outline-none focus:border-ink"
+                />
+              </label>
+              {error ? <p className="text-sm leading-relaxed text-clay">{error}</p> : null}
+              <Button size="lg" className="w-full" disabled={phase !== "idle"} onClick={() => void saveSession()}>
+                {phase === "wait" ? "Sparar…" : "Spara sessionen"}
+              </Button>
+              <p className="text-sm leading-relaxed text-soft">
+                Klistra in hyresvärdens session. Inte personnummer, inte BankID.
+              </p>
+            </>
+          ) : (
+            <>
+              <Button size="lg" className="w-full" disabled={phase !== "idle"} onClick={openDemoBankId}>
+                {phase === "wait" ? "Öppnar BankID…" : "Öppna BankID"}
+              </Button>
+              <p className="text-sm leading-relaxed text-soft">
+                Knappen öppnar BankID på den här enheten, för inloggningen hos {source.name}.
+              </p>
+            </>
+          )}
           <button type="button" className="text-sm text-soft" onClick={() => { setPhase("idle"); setStep("approve"); }}>
             Tillbaka
           </button>
@@ -323,10 +423,12 @@ export function ConnectSheet({
             <IconCheck className="h-7 w-7" />
           </div>
           <h2 className="mt-5 font-serif text-[1.7rem] leading-tight tracking-[-0.03em]">
-            {source.requiresBankId ? `Sessionen hos ${source.name} är kopplad` : success}
+            {real ? `Kopplingen till ${source.name} är köad` : source.requiresBankId ? `Sessionen hos ${source.name} är kopplad` : success}
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-soft">
-            {source.requiresBankId ? (
+            {real ? (
+              <>Du får en notis om e-post, BankID eller något annat som du behöver göra själv hos {source.name}.</>
+            ) : source.requiresBankId ? (
               <>
                 {position === 1
                   ? "Du var först på den här bostaden. "
@@ -397,12 +499,14 @@ function MiniField({
   onChange,
   placeholder,
   inputMode,
+  secret,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   inputMode?: "numeric" | "text";
+  secret?: boolean;
 }) {
   return (
     <label className="block text-sm">
@@ -411,6 +515,8 @@ function MiniField({
         value={value}
         placeholder={placeholder}
         inputMode={inputMode}
+        type={secret ? "password" : "text"}
+        autoComplete={secret ? "current-password" : undefined}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 h-11 w-full rounded-2xl border border-line bg-card px-3 outline-none focus:border-ink"
       />

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { ApplicationLimitSheet } from "@/components/application-limit";
 import { Boot } from "@/components/boot";
-import { ConfirmApply } from "@/components/confirm-apply";
+import { ConfirmApply, ConfirmSend } from "@/components/confirm-apply";
 import { ConnectSheet } from "@/components/connect-sheet";
 import { IconChevron } from "@/components/icons";
 import { Button, StatusPill } from "@/components/ui";
@@ -13,6 +13,7 @@ import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDate, freshness, kr, rok } from "@/lib/format";
 import { canAutoApply } from "@/lib/billing";
 import { Paywall } from "@/components/paywall";
+import { sendConfirmation } from "@/lib/landlord-api";
 import { atApplicationLimit } from "@/lib/limits";
 import { assess } from "@/lib/profile";
 import { useStore } from "@/lib/store";
@@ -27,6 +28,7 @@ function ListingInner() {
   const [confirm, setConfirm] = useState(false);
   const [limited, setLimited] = useState(false);
   const [paywall, setPaywall] = useState(false);
+  const [sendConfirm, setSendConfirm] = useState(false);
 
   useEffect(() => {
     document.title = listing ? `${listing.address} · Blixtbo` : "Bostad · Blixtbo";
@@ -62,6 +64,10 @@ function ListingInner() {
     }
     if (!assess(listing!, store.user?.profile ?? null).ready) {
       setConfirm(true);
+      return;
+    }
+    if (sendConfirmation(source, listing)) {
+      setSendConfirm(true);
       return;
     }
     store.apply(listing!.id);
@@ -142,7 +148,7 @@ function ListingInner() {
             </div>
           ) : application && application.status !== "aterkallad" ? (
             <div className="rounded-2xl bg-pine-soft px-4 py-4 text-sm text-pine-deep">
-              Ansökan skickad. {application.position === 1 ? "Du var först." : `Du var nummer ${application.position}.`}
+              {application.note || (application.position === 1 ? "Du var först." : `Du var nummer ${application.position}.`)}
             </div>
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -178,8 +184,24 @@ function ListingInner() {
         listing={confirm ? listing : null}
         onClose={() => setConfirm(false)}
         onSend={() => {
+          if (sendConfirmation(source, listing)) {
+            setConfirm(false);
+            setSendConfirm(true);
+            return;
+          }
           store.apply(listing.id);
           setConfirm(false);
+        }}
+      />
+      <ConfirmSend
+        open={sendConfirm}
+        title="Bekräfta innan något skickas"
+        body={sendConfirmation(source, listing) || ""}
+        onClose={() => setSendConfirm(false)}
+        onSend={() => {
+          const text = sendConfirmation(source, listing);
+          if (text) store.apply(listing.id, { confirmation: text });
+          setSendConfirm(false);
         }}
       />
     </div>
