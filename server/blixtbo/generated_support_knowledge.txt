@@ -183,10 +183,6 @@ Förstahandskontrakt är ditt eget kontrakt med hyresvärden. Andrahand är när
 Bevakning och ansökningar upp till ett tak.
 kr per månad efter dagars provperiod.
 
-## components/landing.tsx
-relative hidden overflow-hidden bg-[#e7e0d4] lg:block
-Vardagsrum i en lägenhet på Södermalm
-
 ## components/connections.tsx
 Behöver nytt lösenord
 Hålls aktiv · senast
