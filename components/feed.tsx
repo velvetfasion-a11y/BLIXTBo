@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { ApplicationLimitSheet } from "@/components/application-limit";
+import { FullscreenSwipe } from "@/components/fullscreen-swipe";
+import { IconExpand } from "@/components/icons";
 import { LandlordLogo } from "@/components/landlord-logo";
 import { canAutoApply } from "@/lib/billing";
 import { ConfirmApply, ConfirmSend } from "@/components/confirm-apply";
@@ -19,6 +22,7 @@ import { QasaSend } from "@/components/qasa-send";
 import { atApplicationLimit } from "@/lib/limits";
 import { assess, passesFilters } from "@/lib/profile";
 import { useStore } from "@/lib/store";
+import { decideHorizontal, fullscreenApiEnabled, requestElementFullscreen } from "@/lib/swipe";
 import type { Listing } from "@/lib/types";
 
 export function Feed() {
@@ -30,6 +34,8 @@ export function Feed() {
   const [paywall, setPaywall] = useState(false);
   const [sendId, setSendId] = useState<string | null>(null);
   const [qasaId, setQasaId] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const fullscreenRoot = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.title = "Hem · Blixtbo";
@@ -48,9 +54,50 @@ export function Feed() {
   const recent = store.listings.filter((listing) => listing.active && listing.ageMinutes < 180).length;
 
   const activeChips = chips(store.filters);
+  const dialogOpen = Boolean(gate || confirmId || limitId || paywall || sendId || qasaId);
+
+  function requestApply(listing: Listing) {
+    const source = store.sources.find((item) => item.id === listing.sourceId);
+    if (isQasaListing(source, listing)) {
+      setQasaId(listing.id);
+      return false;
+    }
+    const connected = store.connections[listing.sourceId]?.status === "connected";
+    if (listing.manualApply) return false;
+    if (!connected) {
+      setPendingApply(listing.id);
+      setGate(listing.sourceId);
+      return false;
+    }
+    if (atApplicationLimit(store.sources, store.applications, store.listings, listing.sourceId)) {
+      setLimitId(listing.id);
+      return false;
+    }
+    if (!canAutoApply(store.billing)) {
+      setPaywall(true);
+      return false;
+    }
+    if (!assess(listing, store.user?.profile ?? null).ready) {
+      setConfirmId(listing.id);
+      return false;
+    }
+    if (sendConfirmation(source, listing)) {
+      setSendId(listing.id);
+      return false;
+    }
+    return true;
+  }
+
+  function openFullscreen() {
+    // The Fullscreen API only accepts the call in the same turn as the tap.
+    flushSync(() => setFullscreen(true));
+    const doc = document as Document & { webkitFullscreenEnabled?: boolean };
+    requestElementFullscreen(fullscreenRoot.current, fullscreenApiEnabled(doc));
+  }
 
   return (
-    <div className="px-4 pt-5 md:px-8 md:pt-8">
+    <>
+    <div className="px-4 pt-5 md:px-8 md:pt-8" inert={fullscreen ? true : undefined}>
       <div className="mx-auto grid max-w-6xl lg:grid-cols-[minmax(320px,440px)_minmax(0,1fr)] lg:gap-8 lg:items-start">
         <div className="flex h-[calc(100dvh-6.75rem)] flex-col md:h-[calc(100dvh-4rem)]">
           {store.applications.some((item) => item.status === "erbjuden") ? <OfferBanner /> : null}
@@ -96,38 +143,10 @@ export function Feed() {
             ) : (
               <Deck
                 listings={deck}
+                paused={fullscreen}
+                onExpand={openFullscreen}
                 onSkip={(id) => store.skip(id)}
-                onYes={(listing) => {
-                  const source = store.sources.find((item) => item.id === listing.sourceId);
-                  if (isQasaListing(source, listing)) {
-                    setQasaId(listing.id);
-                    return false;
-                  }
-                  const connected = store.connections[listing.sourceId]?.status === "connected";
-                  if (listing.manualApply) return false;
-                  if (!connected) {
-                    setPendingApply(listing.id);
-                    setGate(listing.sourceId);
-                    return false;
-                  }
-                  if (atApplicationLimit(store.sources, store.applications, store.listings, listing.sourceId)) {
-                    setLimitId(listing.id);
-                    return false;
-                  }
-                  if (!canAutoApply(store.billing)) {
-                    setPaywall(true);
-                    return false;
-                  }
-                  if (!assess(listing, store.user?.profile ?? null).ready) {
-                    setConfirmId(listing.id);
-                    return false;
-                  }
-                  if (sendConfirmation(source, listing)) {
-                    setSendId(listing.id);
-                    return false;
-                  }
-                  return true;
-                }}
+                onYes={requestApply}
                 onApply={(id) => store.apply(id)}
               />
             )}
@@ -138,6 +157,18 @@ export function Feed() {
           {deck[0] ? <DetailPanel listing={deck[0]} /> : <div className="rounded-3xl border border-dashed border-line px-6 py-16 text-sm text-soft">När en bostad ligger överst syns detaljerna här.</div>}
         </div>
       </div>
+    </div>
+      {fullscreen ? (
+        <FullscreenSwipe
+          rootRef={fullscreenRoot}
+          listings={deck}
+          dialogOpen={dialogOpen}
+          onClose={() => setFullscreen(false)}
+          onSkip={(id) => store.skip(id)}
+          onYes={requestApply}
+          onApply={(id) => store.apply(id)}
+        />
+      ) : null}
       {gate ? (
         <ConnectSheet
           key={gate}
@@ -182,7 +213,7 @@ export function Feed() {
         open={Boolean(qasaId)}
         onClose={() => setQasaId(null)}
       />
-    </div>
+    </>
   );
 
   function chips(filters: typeof store.filters) {
@@ -202,11 +233,15 @@ export function Feed() {
 
 function Deck({
   listings,
+  paused,
+  onExpand,
   onYes,
   onApply,
   onSkip,
 }: {
   listings: Listing[];
+  paused: boolean;
+  onExpand: () => void;
   onYes: (listing: Listing) => boolean;
   onApply: (id: string) => void;
   onSkip: (id: string) => void;
@@ -228,6 +263,7 @@ function Deck({
   }
 
   useEffect(() => {
+    if (paused) return;
     function onKey(event: KeyboardEvent) {
       if (!top || leaving) return;
       const tag = (event.target as HTMLElement | null)?.tagName;
@@ -239,7 +275,7 @@ function Deck({
     return () => window.removeEventListener("keydown", onKey);
     // commit skapas på nytt i samma render som värdena ovan.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [top, leaving, onYes, onApply, onSkip]);
+  }, [top, leaving, paused, onYes, onApply, onSkip]);
 
   function setDrag(value: number) {
     xRef.current = value;
@@ -273,10 +309,9 @@ function Deck({
         </div>
       ) : null}
       <article
-        className="absolute inset-0 flex touch-none flex-col overflow-hidden rounded-[28px] border border-line bg-card shadow-[0_18px_50px_rgba(48,36,22,0.08)]"
+        className={`swipe-move absolute inset-0 flex touch-none flex-col overflow-hidden rounded-[28px] border border-line bg-card shadow-[0_18px_50px_rgba(48,36,22,0.08)]${dragging ? " is-dragging" : ""}`}
         style={{
           transform: `translate3d(${x}px, 0, 0) rotate(${x / 32}deg)`,
-          transition: dragging ? "none" : "transform 0.28s ease",
         }}
         onPointerDown={(event) => {
           if (leaving) return;
@@ -292,8 +327,9 @@ function Deck({
         onPointerUp={() => {
           if (!dragging) return;
           setDragging(false);
-          if (xRef.current > 110) commit("yes");
-          else if (xRef.current < -110) commit("no");
+          const decision = decideHorizontal(xRef.current);
+          if (decision === "yes") commit("yes");
+          else if (decision === "no") commit("no");
           else setDrag(0);
         }}
         onPointerCancel={() => {
@@ -303,6 +339,15 @@ function Deck({
       >
         <div className="relative min-h-0 flex-1 basis-0">
           <img src={asset(top.photos[0])} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <button
+            id="helskarm-knapp"
+            type="button"
+            onClick={onExpand}
+            className={`absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-card/95 px-3 py-1.5 text-sm font-medium text-ink shadow-[0_8px_24px_rgba(28,25,22,0.12)]${dragging || leaving || x !== 0 ? " pointer-events-none opacity-0" : ""}`}
+          >
+            <IconExpand className="h-4 w-4" />
+            Helskärm
+          </button>
           <div className="absolute top-3 left-3">
             <StatusPill tone="ink">{freshness(top.publishedAt)}</StatusPill>
           </div>
@@ -313,7 +358,7 @@ function Deck({
             JA
           </div>
           <div
-            className="pointer-events-none absolute top-4 right-4 rounded-xl border-2 border-clay px-2 py-1 text-sm font-semibold tracking-wide text-clay"
+            className="pointer-events-none absolute top-14 right-4 rounded-xl border-2 border-clay px-2 py-1 text-sm font-semibold tracking-wide text-clay"
             style={{ opacity: Math.max(0, Math.min(1, -x / 90)) }}
           >
             NEJ

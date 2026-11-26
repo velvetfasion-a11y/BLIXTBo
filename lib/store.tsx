@@ -3,11 +3,22 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, useState } from "react";
 import { canAutoApply } from "@/lib/billing";
 import { createDemo, createFreshUser, createLoggedOut, queueForSource, segmentMatches, welcomeNotice } from "@/lib/data";
-import { cloudReady, postJson, sendConfirmation } from "@/lib/landlord-api";
-import { signOutGoogle } from "@/lib/firebase/auth";
-import { pushState, type CloudState } from "@/lib/firebase/repository";
+import { sendConfirmation } from "@/lib/landlord-api";
+
+type LandlordCloud = typeof import("@/lib/landlord-cloud");
+
+let landlordCloud: LandlordCloud | null = null;
+let landlordCloudTask: Promise<LandlordCloud> | null = null;
+
+function loadLandlordCloud() {
+  landlordCloudTask ??= import("@/lib/landlord-cloud").then((mod) => {
+    landlordCloud = mod;
+    return mod;
+  });
+  return landlordCloudTask;
+}
+import type { CloudState } from "@/lib/firebase/repository";
 import { cloudUid, setCloudSession } from "@/lib/firebase/session";
-import { hydrateCloud, scheduleCloudSync, watchAuth } from "@/lib/firebase/sync";
 import { applicationLimit, atApplicationLimit, isActiveApplication } from "@/lib/limits";
 import { completeness, queueAlert } from "@/lib/profile";
 import type { AppStatus, Billing, Connection, CustomLandlord, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, QasaNote, Source, User } from "@/lib/types";
@@ -128,7 +139,11 @@ function commit(next: Persisted) {
     cache = { raw: localStorage.getItem(KEY) ?? "", value: next };
   }
   window.dispatchEvent(new Event("blixtbo-change"));
-  scheduleCloudSync(next);
+  void import("@/lib/firebase/sync").then(({ scheduleCloudSync }) => scheduleCloudSync(next));
+}
+
+function signOutFirebase() {
+  void import("@/lib/firebase/auth").then(({ signOutGoogle }) => signOutGoogle());
 }
 
 type Undo =
@@ -186,11 +201,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [undo, setUndo] = useState<Undo>(null);
 
   useEffect(() => {
-    return watchAuth((uid) => {
-      const state = latest();
-      if (!state?.user || state.user.demo) return;
-      void pushState(uid, state);
+    void loadLandlordCloud();
+    let stop = () => {};
+    let cancelled = false;
+    void Promise.all([import("@/lib/firebase/sync"), import("@/lib/firebase/repository")]).then(([{ watchAuth }, { pushState }]) => {
+      if (cancelled) return;
+      stop = watchAuth((uid) => {
+        const state = latest();
+        if (!state?.user || state.user.demo) return;
+        void pushState(uid, state);
+      });
     });
+    return () => {
+      cancelled = true;
+      stop();
+    };
   }, []);
 
   useEffect(() => {
@@ -204,7 +229,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const signInDemo = useCallback(() => {
     setCloudSession(null);
-    void signOutGoogle();
+    signOutFirebase();
     commit(createDemo());
     setToast("Exempelkonto öppnat");
     setUndo(null);
@@ -233,6 +258,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const attachGoogle = useCallback(async (uid: string) => {
+    const [{ hydrateCloud }, { pushState }] = await Promise.all([
+      import("@/lib/firebase/sync"),
+      import("@/lib/firebase/repository"),
+    ]);
     await hydrateCloud(uid, (remote: CloudState) => {
       const current = latest() ?? createLoggedOut();
       const sources = current.sources.map((source) => {
@@ -261,7 +290,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     setCloudSession(null);
-    void signOutGoogle();
+    signOutFirebase();
     const current = latest() ?? createLoggedOut();
     const fresh = createLoggedOut();
     commit({
@@ -387,7 +416,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const source = current.sources.find((item) => item.id === listing.sourceId);
     if (listing.sourceId === "qasa" || listing.messageApply) return { status: "confirm" as const };
     const needed = sendConfirmation(source, listing);
-    const real = Boolean(source?.automated && current.user && !current.user.demo && cloudReady());
+    const real = Boolean(source?.automated && current.user && !current.user.demo && landlordCloud?.cloudReady());
     if (needed && !options?.confirmation) return { status: "confirm" as const };
     const published = new Date(listing.publishedAt).getTime();
     const minutesAfter = Math.max(0, Math.round((Date.now() - published) / 60000));
@@ -399,7 +428,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ? "Du var först att ansöka."
         : `Du var nummer ${position} att ansöka.`;
     if (real) {
-      void postJson(`/listings/${encodeURIComponent(listing.id)}/apply`, {
+      void landlordCloud?.postJson(`/listings/${encodeURIComponent(listing.id)}/apply`, {
         source_id: listing.sourceId,
         object_ad_id: listing.objectAdId || listing.externalId || "",
         lagenhet_id: listing.lagenhetId || "",
@@ -827,6 +856,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshLandlord = useCallback(async () => {
+    const { cloudReady, postJson } = await loadLandlordCloud();
     const current = latest();
     if (!current?.user || current.user.demo || !cloudReady()) return;
     try {

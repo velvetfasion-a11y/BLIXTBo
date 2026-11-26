@@ -5,7 +5,7 @@ import { IconCheck } from "@/components/icons";
 import { SourceMark } from "@/components/source-mark";
 import { Button, PrivacyNote, Sheet, cx } from "@/components/ui";
 import { kr, parseMoney } from "@/lib/format";
-import { cloudReady, postJson } from "@/lib/landlord-api";
+import { cloudReady, postJson } from "@/lib/landlord-cloud";
 import { assess } from "@/lib/profile";
 import { useStore } from "@/lib/store";
 import type { Listing } from "@/lib/types";
