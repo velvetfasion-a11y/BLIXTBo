@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApplicationLimitSheet } from "@/components/application-limit";
+import { LandlordLogo } from "@/components/landlord-logo";
 import { canAutoApply } from "@/lib/billing";
 import { ConfirmApply, ConfirmSend } from "@/components/confirm-apply";
 import { Paywall } from "@/components/paywall";
@@ -13,6 +14,7 @@ import { EmptyState, StatusPill } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDateTime, freshness, kr, rokShort } from "@/lib/format";
 import { isQasaListing, sendConfirmation } from "@/lib/landlord-api";
+import { landlordLabel } from "@/lib/landlord-logos";
 import { QasaSend } from "@/components/qasa-send";
 import { atApplicationLimit } from "@/lib/limits";
 import { assess, passesFilters } from "@/lib/profile";
@@ -331,7 +333,10 @@ function Deck({
             {rokShort(top.rooms)} · {top.sqm} m² · {top.features.slice(0, 2).join(" · ") || "Förstahand"}
           </p>
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium">{top.sourceName || sourceName(top.sourceId)}</span>
+            <span className="inline-flex min-w-0 items-center gap-2 font-medium">
+              <LandlordLogo id={top.sourceId} name={top.sourceName || landlordLabel(top.sourceId)} layout="inline" size={18} />
+              <span className="truncate">{top.sourceName || landlordLabel(top.sourceId)}</span>
+            </span>
             <span className={top.deadlineAt ? "text-clay" : "text-soft"}>{deadlineLabel(top.deadlineAt)}</span>
           </div>
           <MatchBlock listing={top} />
@@ -385,7 +390,10 @@ export function DetailPanel({ listing }: { listing: Listing }) {
       <img src={asset(listing.photos[0])} alt="" className="h-64 w-full object-cover" />
       <div className="space-y-4 p-6">
         <div>
-          <p className="text-sm text-soft">{freshness(listing.publishedAt)} · {listing.sourceName || source?.name}</p>
+          <p className="flex items-center gap-2 text-sm text-soft">
+            <LandlordLogo id={listing.sourceId} name={listing.sourceName || source?.name || landlordLabel(listing.sourceId)} layout="inline" size={18} />
+            <span className="min-w-0 truncate">{freshness(listing.publishedAt)} · {listing.sourceName || source?.name}</span>
+          </p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">{listing.address}</h2>
           <p className="text-soft">{listing.area}, {listing.city}</p>
         </div>

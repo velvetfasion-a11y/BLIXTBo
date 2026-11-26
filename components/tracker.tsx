@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Boot } from "@/components/boot";
+import { LandlordIdentity, LandlordLogo } from "@/components/landlord-logo";
 import { Countdown } from "@/components/countdown";
 import { EmptyState, Segmented, StatusPill, Switch, cx } from "@/components/ui";
 import { formatDate, formatDateTime, formatNumber, kr, monthYear, relative, rokShort } from "@/lib/format";
 import { activeForSource, applicationLimit, limitCounter } from "@/lib/limits";
+import { landlordLabel } from "@/lib/landlord-logos";
 import { queueAlert, queuePlace } from "@/lib/profile";
 import { useStore } from "@/lib/store";
 import type { AppStatus, Queue } from "@/lib/types";
@@ -118,7 +120,14 @@ function TrackerInner() {
                       <StatusPill tone={status.tone}>{status.label}</StatusPill>
                       <span className="text-xs text-faint">{relative(application.eventAt)}</span>
                     </div>
-                    <h2 className="mt-3 text-lg font-semibold tracking-tight">{listing.address}</h2>
+                    <LandlordIdentity
+                      id={listing.sourceId}
+                      name={listing.sourceName || landlordLabel(listing.sourceId)}
+                      size={36}
+                      className="mt-3"
+                      nameClassName="text-sm font-medium"
+                    />
+                    <h2 className="mt-2 text-lg font-semibold tracking-tight">{listing.address}</h2>
                     <p className="mt-1 text-sm text-soft">
                       {listing.area} · {rokShort(listing.rooms)} · {kr(listing.rent)}
                     </p>
@@ -180,9 +189,12 @@ function TrackerInner() {
               return (
                 <article key={queue.id} className="rounded-3xl border border-line bg-card p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold tracking-tight">{queue.name}</h2>
-                      <p className="text-sm text-soft">{queue.city} · i kön sedan {monthYear(queue.since)}</p>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <LandlordLogo id={queue.sourceId} name={queue.name} size={48} />
+                      <div className="min-w-0">
+                        <h2 className="text-lg font-semibold tracking-tight">{queue.name}</h2>
+                        <p className="text-sm text-soft">{queue.city} · i kön sedan {monthYear(queue.since)}</p>
+                      </div>
                     </div>
                     <p className="num text-right text-2xl font-semibold tracking-tight">
                       {queue.days != null ? formatNumber(queue.days) : queue.points != null ? formatNumber(queue.points) : "–"}
@@ -224,13 +236,14 @@ function ApplicationCounters() {
     const connected = store.connections[source.id]?.status === "connected";
     const count = activeForSource(store.applications, store.listings, source.id).length;
     if (!connected && count === 0) return [];
-    return [{ id: source.id, label: limitCounter(source, count) }];
+    return [{ id: source.id, name: source.name, label: limitCounter(source, count) }];
   });
   if (rows.length === 0) return null;
   return (
     <div className="mt-4 flex flex-wrap gap-2">
       {rows.map((row) => (
-        <p key={row.id} className="rounded-full bg-paper-deep px-3 py-1 text-sm text-ink">
+        <p key={row.id} className="inline-flex items-center gap-2 rounded-full bg-paper-deep px-3 py-1 text-sm text-ink">
+          <LandlordLogo id={row.id} name={row.name} layout="inline" size={16} />
           {row.label}
         </p>
       ))}
@@ -252,8 +265,9 @@ function WaitingList() {
           return (
             <li key={spot.listingId} className="text-sm">
               <Link href={`/bostad?id=${listing.id}`} className="font-medium">{listing.address}</Link>
-              <p className="mt-0.5 text-soft">
-                {source?.name}. Vi säger till när en ansökan avslutas och en plats öppnas.
+              <p className="mt-0.5 flex items-center gap-2 text-soft">
+                {source ? <LandlordLogo id={source.id} name={source.name} layout="inline" size={16} /> : null}
+                <span>{source?.name}. Vi säger till när en ansökan avslutas och en plats öppnas.</span>
               </p>
             </li>
           );

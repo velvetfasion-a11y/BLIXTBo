@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LandlordIdentity } from "@/components/landlord-logo";
 import { Button, Sheet } from "@/components/ui";
 import { kr, rokShort } from "@/lib/format";
 import { activeForSource, limitMessage } from "@/lib/limits";
@@ -62,6 +63,7 @@ export function ApplicationLimitSheet({
         </div>
       ) : (
         <div className="space-y-4">
+          <LandlordIdentity id={source.id} name={source.name} size={40} nameClassName="text-sm font-medium" />
           <h2 className="font-serif text-[1.65rem] leading-tight tracking-[-0.03em]">{limitMessage(source)}</h2>
           <p className="text-sm leading-relaxed text-soft">
             Inget brådskar. Byt en ansökan, spara bostaden tills en plats öppnas, eller läs om {source.id === "homeq" ? "HomeQ+" : "deras plus"} hos {source.name}. Blixtbo säljer det inte.

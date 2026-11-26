@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ConnectSheet } from "@/components/connect-sheet";
 import { CustomLandlords } from "@/components/custom-landlords";
+import { LandlordLogo } from "@/components/landlord-logo";
 import { IconChevron } from "@/components/icons";
 import { Button, PrivacyNote, cx } from "@/components/ui";
 import { useStore } from "@/lib/store";
@@ -42,10 +43,13 @@ export function Connections() {
           return (
             <li key={source.id} className="rounded-3xl border border-line bg-card p-4">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs text-soft">{source.kind}</p>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight">{source.name}</h2>
-                  <p className="mt-1 text-sm leading-relaxed text-soft">{source.blurb}</p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <LandlordLogo id={source.id} name={source.name} size={52} />
+                  <div className="min-w-0">
+                    <p className="text-xs text-soft">{source.kind}</p>
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight">{source.name}</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-soft">{source.blurb}</p>
+                  </div>
                 </div>
                 <span className={cx("shrink-0 rounded-full px-2.5 py-1 text-xs font-medium", on ? "bg-pine-soft text-pine-deep" : waiting ? "bg-paper-deep text-clay" : "bg-paper-deep text-soft")}>
                   {label}

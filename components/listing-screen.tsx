@@ -8,6 +8,7 @@ import { Boot } from "@/components/boot";
 import { ConfirmApply, ConfirmSend } from "@/components/confirm-apply";
 import { ConnectSheet } from "@/components/connect-sheet";
 import { IconChevron } from "@/components/icons";
+import { LandlordLogo } from "@/components/landlord-logo";
 import { Button, StatusPill } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDate, freshness, kr, rok } from "@/lib/format";
@@ -147,8 +148,9 @@ function ListingInner() {
               })}
             </ul>
           </section>
-          <p className="text-sm text-soft">
-            Källa: {source?.name}. {connected ? "Kontot är kopplat." : "Kontot är inte kopplat ännu."}
+          <p className="flex items-center gap-2.5 text-sm text-soft">
+            {source ? <LandlordLogo id={source.id} name={source.name} size={40} /> : null}
+            <span>Källa: {source?.name}. {connected ? "Kontot är kopplat." : "Kontot är inte kopplat ännu."}</span>
           </p>
           {isQasaListing(source, listing) ? (
             <div className="space-y-3">

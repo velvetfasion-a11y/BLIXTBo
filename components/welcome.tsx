@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Boot } from "@/components/boot";
+import { LandlordLogoCloud } from "@/components/landlord-logo-cloud";
 import { Wordmark } from "@/components/mark";
 import { SignIn } from "@/components/sign-in";
 import { SiteFooter } from "@/components/site-footer";
@@ -84,6 +85,9 @@ export function Welcome() {
           <p className="mt-5 max-w-md text-base leading-relaxed text-soft sm:text-lg">
             Förstahandskontrakt går till den som ansöker först. Blixtbo bevakar hyresvärdarna och har din ansökan redo.
           </p>
+          <div className="mt-8">
+            <LandlordLogoCloud />
+          </div>
           <div className="mt-8 sm:max-w-sm">
             <SignIn />
           </div>
