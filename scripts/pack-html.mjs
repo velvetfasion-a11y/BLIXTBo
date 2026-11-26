@@ -30,6 +30,17 @@ for (const name of fs.readdirSync(photosDir)) {
   assets[`/photos/${name}`] = `data:image/jpeg;base64,${b64}`;
 }
 
+const landlordsDir = path.join(root, "public/landlords");
+if (fs.existsSync(landlordsDir)) {
+  for (const name of fs.readdirSync(landlordsDir)) {
+    const ext = path.extname(name).slice(1).toLowerCase();
+    const mime = ext === "svg" ? "image/svg+xml" : ext === "png" ? "image/png" : "";
+    if (!mime) continue;
+    const b64 = fs.readFileSync(path.join(landlordsDir, name)).toString("base64");
+    assets[`/landlords/${name}`] = `data:${mime};base64,${b64}`;
+  }
+}
+
 const jsResult = await esbuild.build({
   absWorkingDir: root,
   entryPoints: ["standalone/entry.tsx"],

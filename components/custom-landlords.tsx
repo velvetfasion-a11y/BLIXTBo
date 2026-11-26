@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LandlordLogo } from "@/components/landlord-logo";
 import { Button, Field } from "@/components/ui";
 import { passesFilters } from "@/lib/profile";
 import { useStore } from "@/lib/store";
@@ -201,13 +202,18 @@ export function CustomLandlords() {
       <ul className="mt-4 space-y-3">
         {store.customLandlords.map((landlord) => (
           <li key={landlord.id} className="rounded-3xl border border-line bg-card p-4">
-            <p className="text-xs text-soft">{KINDS.find((item) => item.id === landlord.kind)?.label}</p>
-            <h3 className="mt-1 text-lg font-semibold">{landlord.name}</h3>
-            <p className="mt-1 text-sm text-soft">
+            <div className="flex items-start gap-3">
+              <LandlordLogo id={landlord.id} name={landlord.name} size={48} />
+              <div className="min-w-0">
+                <p className="text-xs text-soft">{KINDS.find((item) => item.id === landlord.kind)?.label}</p>
+                <h3 className="mt-1 text-lg font-semibold">{landlord.name}</h3>
+                <p className="mt-1 text-sm text-soft">
               {[landlord.city, landlord.country].filter(Boolean).join(", ") || "Ort saknas"}
               {landlord.confirmed ? "" : " · inte bekräftad"}
               {landlord.applyMode === "manual" && landlord.confirmed ? " · ansök själv" : ""}
-            </p>
+                </p>
+              </div>
+            </div>
             <div className="mt-3 flex gap-3 text-sm">
               <button type="button" className="text-pine" onClick={() => edit(landlord.id)}>Redigera</button>
               <button type="button" className="text-clay" onClick={() => store.removeCustomLandlord(landlord.id)}>Ta bort</button>

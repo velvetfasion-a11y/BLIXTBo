@@ -1,5 +1,6 @@
 import { FaqList } from "@/components/faq-list";
 import { LandingNotice } from "@/components/landing-notice";
+import { LandlordLogoCloud } from "@/components/landlord-logo-cloud";
 import { Wordmark } from "@/components/mark";
 import { SiteFooter } from "@/components/site-footer";
 import { asset } from "@/lib/asset";
@@ -18,6 +19,9 @@ export function Landing({ signIn }: { signIn: React.ReactNode }) {
               {HOME_H1}
             </h1>
             <p className="mt-5 max-w-lg text-base leading-relaxed text-soft sm:text-lg">{HOME_SUBLINE}</p>
+            <div className="mt-8">
+              <LandlordLogoCloud />
+            </div>
             <div className="mt-8 sm:max-w-sm">{signIn}</div>
           </div>
         </div>

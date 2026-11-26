@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Boot } from "@/components/boot";
+import { LandlordLogo } from "@/components/landlord-logo";
 import { Mark } from "@/components/mark";
 import { Button, Field, Switch, cx } from "@/components/ui";
 import { SEGMENTS, segmentMatches } from "@/lib/data";
@@ -121,9 +122,12 @@ export function AdminHome() {
           {slow.length === 0 ? <p className="mt-3 text-sm text-soft">Alla källor är i tid.</p> : null}
           <ul className="mt-3 space-y-3">
             {slow.map((source) => (
-              <li key={source.id} className="text-sm">
-                <p className="font-medium">{source.name}</p>
-                <p className="text-soft">{source.enabled ? syncLabel(source.syncMin) : "Pausad"} · {source.health === "delayed" ? "fördröjd" : "ok"}</p>
+              <li key={source.id} className="flex items-center gap-3 text-sm">
+                <LandlordLogo id={source.id} name={source.name} layout="inline" size={18} />
+                <div>
+                  <p className="font-medium">{source.name}</p>
+                  <p className="text-soft">{source.enabled ? syncLabel(source.syncMin) : "Pausad"} · {source.health === "delayed" ? "fördröjd" : "ok"}</p>
+                </div>
               </li>
             ))}
           </ul>
@@ -313,12 +317,15 @@ export function AdminSources() {
           return (
             <li key={source.id} className="rounded-3xl border border-line bg-card px-4 py-4">
               <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium">{source.name}</p>
-                  <p className="mt-1 text-sm text-soft">
-                    {source.kind} · {count} synliga · {syncLabel(source.syncMin)}
-                    {source.health === "delayed" ? " · fördröjd" : ""}
-                  </p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <LandlordLogo id={source.id} name={source.name} size={44} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{source.name}</p>
+                    <p className="mt-1 text-sm text-soft">
+                      {source.kind} · {count} synliga · {syncLabel(source.syncMin)}
+                      {source.health === "delayed" ? " · fördröjd" : ""}
+                    </p>
+                  </div>
                 </div>
                 <Switch on={source.enabled} label={`Aktivera ${source.name}`} onClick={() => store.toggleSource(source.id)} />
               </div>

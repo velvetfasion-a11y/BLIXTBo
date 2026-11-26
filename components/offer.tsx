@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Boot } from "@/components/boot";
 import { Countdown } from "@/components/countdown";
 import { IconChevron } from "@/components/icons";
+import { LandlordIdentity } from "@/components/landlord-logo";
 import { Button, Sheet } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { floorLabel, formatDate, formatDateTime, kr, rok } from "@/lib/format";
@@ -53,7 +54,8 @@ function OfferInner() {
           <div>
             <p className="text-sm font-medium text-pine">Erbjudande</p>
             <h1 className="mt-2 font-serif text-4xl tracking-[-0.03em]">Grattis. Du har erbjudits {listing.address}.</h1>
-            <p className="mt-2 text-soft">{listing.area}, {listing.city} · {source?.name}</p>
+            <p className="mt-2 text-soft">{listing.area}, {listing.city}</p>
+            {source ? <LandlordIdentity id={source.id} name={source.name} size={36} className="mt-3" nameClassName="text-sm font-medium" /> : null}
           </div>
           {open ? (
             <div className="rounded-2xl bg-paper px-4 py-4">
