@@ -28,6 +28,7 @@ Gratisversionen har ett tak på 2 automatiska ansökningar. Premium tar bort tak
 Radera bara Blixtbo-kontot
 Kontot stängs och går inte att logga in på. Sådant som inte är själva kontot lämnas kvar.
 Namn, e-post och kopplingen till inloggningen i Blixtbo
+Recensioner du lämnat i Blixtbo
 Supportärenden och chattar med support
 Möjligheten att öppna det här kontot
 Profil, ansökningar, sparade sökningar och filter
@@ -46,8 +47,7 @@ Fakturor och andra betalunderlag hos Stripe. Bokföringslagen kräver att de spa
 Koppla bort länkade konton
 Blixtbo-kontot finns kvar. Inloggningar som appen har sparat hos andra tas bort.
 Kopplingen till Google och Apple
-Blixtbo-kontot, profilen, ansökningar, filter och meddelanden
-Supportärenden och chattar
+Blixtbo-kontot, profilen, ansökningar, filter, meddelanden och recensioner
 Om Google eller Apple är ditt enda sätt att logga in behöver du en ny inloggning nästa gång. Kontot och uppgifterna finns kvar.
 
 ## components/privacy.tsx
@@ -66,6 +66,9 @@ Kontouppgifter sparas så länge kontot finns. Krypterade inloggningar hos hyres
 Betalningar hanteras av Stripe. Inloggning och kontots uppgifter hanteras med Google Firebase. De behandlar uppgifterna för Blixtbos räkning för de delarna. En del av behandlingen kan ske utanför EU, med de skyddsåtgärder leverantörerna tillhandahåller för sådan överföring.
 Du kan begära tillgång, rättelse, radering, begränsning och dataportabilitet, och invända mot behandling som stödjer sig på berättigat intresse. Du kan också klaga hos Integritetsskyddsmyndigheten, imy.se.
 Radering gör du själv under Inställningar när du är inloggad. Du skriver RADERA innan något händer. Radera bara Blixtbo-kontot stänger inloggningen och tar bort supportärenden och chattar. Radera alla uppgifter om mig tar bort profil, ansökningar, meddelanden, supportärenden och chattar, hyresvärdarnas inloggningar och loggar som pekar på dig, avslutar prenumerationen och anonymiserar Stripe-kunden. Kopplar du bara bort länkade konton ligger supportärendena kvar. Hur de tre valen skiljer sig beskrivs under Hjälp.
+När du har fått en lägenhet kan du lämna ett betyg från 1 till 5 och en valfri text, högst ungefär 1 000 tecken. Vi sparar ditt användar-id, betyget, texten, hyresvärden om den hör till ansökan, tidpunkten och om du samtyckt till att recensionen visas.
+Samtycket är frivilligt. Kryssar du i att vi får visa recensionen används bara förnamn. Utan den rutan visas recensionen inte för andra. Du kan ändra recensionen efteråt. Det finns en recension per lägenhet du har fått.
+Recensioner raderas när Blixtbo-kontot raderas, och när du ber om att alla uppgifter om dig raderas. Att bara koppla bort Google, Apple eller en hyresvärd lämnar recensionen kvar, eftersom kontot finns kvar.
 
 ## components/terms.tsx
 Köpvillkor för Blixtbo Premium
@@ -84,6 +87,8 @@ Fakturor och andra betalunderlag behålls enligt bokföringslagen. De kopplas bo
 ## components/help.tsx
 Kort om hur Blixtbo fungerar, vad en betalning innebär, och hur du tar bort konto eller uppgifter.
 Till inställningar
+Guider om att hyra
+Steg för steg om personbevis, köer, borgen och vad hyresvärdar brukar kräva. Guiderna är allmän information, inte juridisk rådgivning, och Blixtbo garanterar inget kontrakt.
 Hur Blixtbo fungerar
 Blixtbo bevakar hyresvärdarnas annonser och lägger nya bostäder överst. Du anger område, hyra, storlek och inflytt en gång. Ett ja kan skicka ansökan med profilen du redan fyllt i.
 Samma profil används hos varje hyresvärd: yrke, inkomst, hushåll, brev och dokument. Under Koll ser du ansökningar, ködagar och när en kö behöver förnyas.
@@ -94,9 +99,9 @@ En paus stänger av automatiska ansökningar utan att avsluta kontot. Den finns 
 Radering av konto och uppgifter
 Under Inställningar, när du är inloggad, finns tre val. Du skriver RADERA innan något händer. Om inloggningen är för gammal ber vi dig logga in igen i ett fönster.
 Radera bara Blixtbo-kontot.
-Namn, e-post och kopplingen till inloggningen tas bort, så kontot går inte att öppna. Supportärenden och chattar med support tas också bort. Ansökningar, sparade sökningar och filter, meddelanden, hyresvärdarnas inloggningar, loggar och betaluppgifter lämnas kvar. Firebase-kontot finns kvar.
+Namn, e-post och kopplingen till inloggningen tas bort, så kontot går inte att öppna. Recensioner, supportärenden och chattar med support tas också bort. Ansökningar, sparade sökningar och filter, meddelanden, hyresvärdarnas inloggningar, loggar och betaluppgifter lämnas kvar. Firebase-kontot finns kvar.
 Radera alla uppgifter om mig.
-Det är radering enligt dataskyddsförordningen (GDPR). Profil, ansökningar, sparade sökningar och filter, meddelanden och notiser, supportärenden och chattar med support, sparade inloggningar hos hyresvärdar och loggar som pekar på dig tas bort. Prenumerationen avslutas. Stripe-kunden anonymiseras, och Firebase-kontot tas bort.
+Det är radering enligt dataskyddsförordningen (GDPR). Profil, ansökningar, recensioner, sparade sökningar och filter, meddelanden och notiser, supportärenden och chattar med support, sparade inloggningar hos hyresvärdar och loggar som pekar på dig tas bort. Prenumerationen avslutas. Stripe-kunden anonymiseras, och Firebase-kontot tas bort.
 Fakturor och andra betalunderlag behålls, eftersom bokföringslagen kräver det. De kopplas inte längre till ditt namn eller din e-post.
 Koppla bort länkade konton.
 Inloggningar hos hyresvärdar tas bort, och Google och Apple kopplas bort. Blixtbo-kontot, profilen och prenumerationen finns kvar. Om Google eller Apple är ditt enda sätt att logga in behöver du en ny inloggning nästa gång.
@@ -117,6 +122,8 @@ Skriv RADERA för att bekräfta
 Knappen går att trycka först när ordet står exakt så.
 Här hanterar du kontot. Prenumerationen ligger ett steg in. Radering ligger längst ner och kräver att du skriver ordet RADERA.
 Så fungerar Blixtbo, betalning och uppgifter
+Personbevis, köer, borgen och vad hyresvärdar kräver
+Uppgifter, recensioner och radering
 Radera eller koppla bort
 Välj ett alternativ. Läs vad som tas bort och vad som lämnas kvar innan du bekräftar. Det går inte att ångra i efterhand.
 Det här lämnas kvar
@@ -181,9 +188,17 @@ relative hidden overflow-hidden bg-[#e7e0d4] lg:block
 Vardagsrum i en lägenhet på Södermalm
 
 ## components/connections.tsx
+Behöver nytt lösenord
+Hålls aktiv · senast
+Betala köavgiften före
+Pausad – kräver Premium
 Hyresvärdar · Blixtbo
+Uppdatera lösenord
+Logga in för att spara datumet.
+Sparat. Vi påminner dig.
 store.connections[source.id]?.status === "connected").length; return (
 Förnyelse kan kräva ett nytt BankID-godkännande. Du får en notis.
+Köavgift förfaller
 
 ## components/subscription.tsx
 Pausa – jag har hittat bostad

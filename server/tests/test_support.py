@@ -431,6 +431,9 @@ class Gateway:
     def clear_account(self, uid):
         return None
 
+    def delete_reviews(self, uid):
+        return None
+
     def purge_user(self, uid):
         return None
 
