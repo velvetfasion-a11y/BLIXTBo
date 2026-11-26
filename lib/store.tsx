@@ -168,7 +168,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(
     (input: { name: string; email: string; method: User["method"] }) => {
-      if (input.method !== "google") setCloudSession(null);
+      if (input.method === "email") setCloudSession(null);
       const current = latest() ?? createLoggedOut();
       const user = createFreshUser(input);
       commit({
@@ -195,9 +195,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const limit = remote.limits[source.id];
         return limit ? { ...source, ...limit } : source;
       });
+      const remoteUser = remote.user?.profile ? remote.user : null;
+      const keptName = remoteUser?.name?.trim() || current.user?.name || "";
       commit({
         ...current,
-        user: remote.user?.profile ? remote.user : current.user,
+        user: remoteUser ? { ...remoteUser, name: keptName } : current.user,
         filters: remote.filters ?? current.filters,
         prefs: remote.prefs ?? current.prefs,
         waiting: remote.waiting ?? [],

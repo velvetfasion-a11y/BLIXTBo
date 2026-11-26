@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Boot } from "@/components/boot";
 import { Wordmark } from "@/components/mark";
-import { Button } from "@/components/ui";
+import { SignIn } from "@/components/sign-in";
 import { asset } from "@/lib/asset";
 import { useStore } from "@/lib/store";
 
@@ -26,9 +26,12 @@ const PROMISES = [
 export function Welcome() {
   const store = useStore();
   const router = useRouter();
+  const signedInOnArrival = useRef<boolean | null>(null);
 
   useEffect(() => {
-    if (store.ready && store.user) router.replace("/hem");
+    if (!store.ready) return;
+    if (signedInOnArrival.current === null) signedInOnArrival.current = Boolean(store.user);
+    if (signedInOnArrival.current && store.user) router.replace("/hem");
   }, [store.ready, store.user, router]);
 
   useEffect(() => {
@@ -52,22 +55,9 @@ export function Welcome() {
           <p className="mt-5 max-w-md text-base leading-relaxed text-soft sm:text-lg">
             Förstahandskontrakt går till den som ansöker först. Blixtbo bevakar hyresvärdarna och har din ansökan redo.
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:max-w-sm">
-            <Button size="lg" onClick={() => router.push("/konto")}>
-              Skapa konto
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => {
-                store.signInDemo();
-                router.push("/hem");
-              }}
-            >
-              Öppna exempelkonto
-            </Button>
+          <div className="mt-8 sm:max-w-sm">
+            <SignIn />
           </div>
-          <p className="mt-4 text-xs leading-relaxed text-faint">Prototyp med exempeldata. Ingenting lämnar den här enheten.</p>
         </div>
         <ul className="mt-12 divide-y divide-line border-y border-line lg:mt-16">
           {PROMISES.map((item) => (
