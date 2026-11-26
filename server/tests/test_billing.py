@@ -32,6 +32,7 @@ def test_free_limit_premium_trial_and_pause():
     assert can_auto_apply("free", "free", 0, 2) is True
     assert can_auto_apply("free", "free", 2, 2) is False
     assert can_auto_apply("premium", "active", 9, 2) is True
+    assert can_auto_apply("premium", "trialing", 9, 2) is True
     assert can_auto_apply("premium", "paused", 0, 2) is False
     trialing = entitlement_from_subscription({"id": "sub_1", "customer": "cus_1", "status": "trialing", "pause_collection": None})
     assert trialing["plan"] == "premium"

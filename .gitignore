@@ -38,6 +38,13 @@ yarn-error.log*
 __pycache__/
 *.pyc
 
+# iOS app dependencies and generated native projects
+apps/mobile/node_modules
+apps/mobile/.expo
+apps/mobile/dist
+apps/mobile/ios
+apps/mobile/android
+
 # vercel
 .vercel
 

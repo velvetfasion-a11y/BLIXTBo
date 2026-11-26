@@ -107,9 +107,10 @@ function PaywallBody({ onClose }: { onClose: () => void }) {
     const { response, data } = await apiFetch("/billing/entitlement");
     if (!response.ok || !data || typeof data !== "object") return;
     const entitlement = data as { plan?: string; status?: string };
+    const reported = entitlement.status === "trialing" ? "active" : entitlement.status;
     store.setBilling({
       plan: entitlement.plan === "premium" ? "premium" : "free",
-      status: entitlement.status === "paused" || entitlement.status === "canceled" || entitlement.status === "active" ? entitlement.status : "free",
+      status: reported === "paused" || reported === "canceled" || reported === "active" ? reported : "free",
       usedAutoApplies: store.billing.usedAutoApplies,
     });
   }

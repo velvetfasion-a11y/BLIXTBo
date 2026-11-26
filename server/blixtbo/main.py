@@ -300,8 +300,32 @@ def _billing_user(request: Request, db: Session) -> User:
 @app.get("/billing/subscription")
 def billing_subscription(request: Request, db: Session = Depends(get_db)) -> dict:
     user = _billing_user(request, db)
-    _stripe_client, raw = _subscription_state(user)
-    return subscription_view(raw)
+    view = subscription_view(None)
+    try:
+        _stripe_client, raw = _subscription_state(user)
+        view = subscription_view(raw)
+    except HTTPException as exc:
+        if exc.status_code != 503:
+            raise
+    if view.get("plan") == "premium":
+        return view
+    apple = _apple_subscription_view(user.firebase_uid)
+    return apple or view
+
+
+def _apple_subscription_view(uid: str) -> dict | None:
+    if settings.data_backend != "firestore" or not uid:
+        return None
+    try:
+        from blixtbo.apple_billing import subscription_view_from_entitlement
+        from blixtbo.firebase_app import firestore_client
+
+        snap = firestore_client().collection("users").document(uid).collection("billing").document("entitlement").get()
+    except Exception:
+        return None
+    if not getattr(snap, "exists", False):
+        return None
+    return subscription_view_from_entitlement(snap.to_dict() or {})
 
 
 @app.post("/billing/pause")
@@ -720,3 +744,8 @@ def admin_users(owner: User = Depends(require_owner), db: Session = Depends(get_
     audit(db, owner.email, "admin.users")
     rows = db.query(User).order_by(User.created_at.desc()).limit(200).all()
     return [{"id": row.id, "email": row.email, "name": row.name, "method": row.auth_method} for row in rows]
+
+
+from blixtbo.ios_api import router as ios_router
+
+app.include_router(ios_router)

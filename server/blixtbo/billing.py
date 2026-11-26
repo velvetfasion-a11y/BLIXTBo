@@ -154,7 +154,7 @@ def can_auto_apply(plan: str, status: str, used: int, free_limit: int | None = N
     limit = settings.free_auto_apply_limit if free_limit is None else free_limit
     if status == "paused":
         return False
-    if plan == "premium" and status == "active":
+    if plan == "premium" and status in ("active", "trialing"):
         return True
     return used < limit
 

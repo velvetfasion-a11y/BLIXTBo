@@ -107,3 +107,38 @@ class DeletionJournal(Base):
     phase: Mapped[str] = mapped_column(String(32), default="started")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AppleAccount(Base):
+    """Maps an App Store appAccountToken and original transaction to a Firebase user."""
+
+    __tablename__ = "apple_accounts"
+
+    firebase_uid: Mapped[str] = mapped_column(String(128), primary_key=True)
+    app_account_token: Mapped[str] = mapped_column(String(36), unique=True)
+    original_transaction_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AppleNotification(Base):
+    """Processed App Store Server Notification UUID. Retries are acknowledged and ignored."""
+
+    __tablename__ = "apple_notifications"
+
+    notification_uuid: Mapped[str] = mapped_column(String(64), primary_key=True)
+    firebase_uid: Mapped[str] = mapped_column(String(128), default="")
+    notification_type: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DeviceToken(Base):
+    """APNs or Expo push token for one iOS install. Not a landlord secret."""
+
+    __tablename__ = "device_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    token: Mapped[str] = mapped_column(String(4096), unique=True)
+    platform: Mapped[str] = mapped_column(String(16), default="ios")
+    kind: Mapped[str] = mapped_column(String(16), default="apns")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
