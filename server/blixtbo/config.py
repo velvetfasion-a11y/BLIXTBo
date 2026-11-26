@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:////data/blixtbo.db"
     app_secret: str = "dev-only-change-me"
     worker_kek: str = ""
+    # Public half seals passwords before they touch the queue. Not a secret.
+    worker_seal_public: str = ""
+    # Private half. Only the worker may set this. The API leaves it empty.
+    worker_seal_private: str = ""
     owner_google_email: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""

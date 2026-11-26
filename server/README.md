@@ -2,7 +2,7 @@
 
 API plus one Playwright worker. No paid model. Landlord passwords are encrypted with a per-user key. Only the worker has the key that unwraps them. The API and the admin screens never receive it.
 
-App data lives in Firestore (`DATA_BACKEND=firestore`). Postgres remains the worker job queue. The worker writes ciphertext to `credentials/{firebaseUid}/landlords/{sourceId}` with the Admin SDK. Set `FIREBASE_AUTH_EMULATOR_HOST` and `FIRESTORE_EMULATOR_HOST` when you point that SDK at the emulators. `LANDLORD_MODE` stays `dry-run` until a real landlord page has been checked.
+App data lives in Firestore (`DATA_BACKEND=firestore`). Postgres remains the worker job queue. The worker writes ciphertext to `credentials/{firebaseUid}/landlords/{sourceId}` with the Admin SDK. Set `FIREBASE_AUTH_EMULATOR_HOST` and `FIRESTORE_EMULATOR_HOST` when you point that SDK at the emulators. `LANDLORD_MODE` stays `dry-run` until you mean to call the landlord sites. The worker reads it from the environment (`${LANDLORD_MODE:-dry-run}`). It is not hard-coded in compose.
 
 End users sign in with Firebase Auth in the browser. `POST /auth/firebase` with `Authorization: Bearer <ID token>` links that user to the API. `/internal/ops` still requires that token, `OWNER_GOOGLE_EMAIL`, and the TOTP cookie. The old Google OAuth redirect is unused for new sign-ins.
 
@@ -16,7 +16,7 @@ Nothing in this folder buys or starts a server. The steps below are what you run
 
 Applying and renewing are Playwright scripts. A small open embedding model is used only to compare a profile with the wording of an ad. Income and documents are checked with ordinary rules.
 
-Set `LANDLORD_MODE=dry-run` until the selectors for each landlord page have been checked. Dry-run does not open those sites.
+Set `LANDLORD_MODE=dry-run` until you want live calls. Dry-run does not open landlord sites. Live calls each site's own JSON API or HTML form. A browser fallback exists only when `LANDLORD_BROWSER=1`.
 
 ## Deploy
 
@@ -47,16 +47,36 @@ curl -fsS http://127.0.0.1:8080/health
 
 9. Put Caddy or another reverse proxy on port 443 and forward to `127.0.0.1:8080`. Do not publish Postgres.
 10. Sign in with Google on the site. Open `https://your-domain.example/internal/ops` (or whatever you set as `ADMIN_PATH`). The first visit shows an otpauth URI. Add it to an authenticator app, then POST the 6-digit code to `/internal/ops/totp`. After that, the admin pages stay behind that code for eight hours.
-11. Keep `LANDLORD_MODE=dry-run` until you have watched one real login in a staging browser and updated the selectors in `blixtbo/landlords.py`. Then set `LANDLORD_MODE=live` and recreate the worker: `docker compose up -d worker`.
+11. Keep `LANDLORD_MODE=dry-run` until the adapters have been checked against fixtures. Then set `LANDLORD_MODE=live` in `.env` and recreate the worker: `docker compose up -d worker`. A server override file can pin the same variable; this compose file does not.
 
 Backups are `pg_dump` of the database volume. Losing `WORKER_KEK` makes every stored landlord login unreadable. Keep a copy of that value outside the server, not in git.
 
 ## Login handling
 
-A user approves once in the app, with Google or an email code. The worker then creates the landlord account, generates the password, and stores it as ciphertext under that user's data key. Later apply and renew jobs decrypt it only inside the worker, log in, and do the task.
+A password the user types is sealed in the API with `WORKER_SEAL_PUBLIC` before it is written on the job. The API has no `WORKER_KEK` and no `WORKER_SEAL_PRIVATE`, so it cannot open the seal or unwrap a data key. The worker opens the seal, encrypts the password under the user's data key, and replaces the job payload with `{}`. Plaintext is not stored. BankID fields are refused.
 
-If the site says the password is wrong, or the session is dead and a fresh login fails, the connection is marked `needs_user` and the user gets a notice. The worker does not guess a new password.
+HomeQ is the landlord where Blixtbo can create an account: e-post, lösenord and the in-app terms approval. The job then pauses until HomeQ says the e-mail is confirmed and the user has verified with BankID at HomeQ. Those notices are "Bekräfta e-posten från HomeQ" and "Verifiera dig med BankID hos HomeQ". Apply uses `POST /api/v4/applications` with the listing's object id. Each HomeQ error code becomes a Swedish notice. There is no queue to renew; renew re-checks the token.
 
-Each landlord has a `requires_bankid` flag. Wåhlin and Stena Fastigheter are examples that require it. The worker does not script that login. It pauses the job (`waiting_bankid`) and notifies the user to open BankID on their own device, at the landlord, not at Blixtbo. When the landlord session comes back, the worker stores only that session cookie, encrypted with the user's data key, and deletes the plaintext from the job. Personal numbers, autostart tokens, signatures, and any other BankID field are refused and never written. A later renewal pauses again and sends a new notice, because the landlord may ask for BankID once more.
+Bostadsförmedlingen is BankID only. The user logs in on their site and Blixtbo stores the session cookie. An interest is binding for the seeker with the longest queue time after the ad ends, so nothing is sent until the app stores that confirmation on the job. `ArInloggad=false` means the session expired and the job waits for BankID again. Renew checks the session and tells the user if the queue needs a renewal. Svenska Bostäder, Familjebostäder and Stockholmshem are in that same queue. They have no separate login.
+
+Wåhlin, Heimstaden, Victoriahem (formerly Hembla) and Rikshem take an existing site password on the Mina sidor form. Blixtbo does not create those accounts. A session cookie is the alternative. BankID buttons on those pages are never called. Rikshem homes in Stockholm, Uppsala and Malmö stay on the municipal queues.
+
+Stena Fastigheter takes e-post and password (`user_type: Tenant`) on the public credentials call. A one-time code pauses the job. The BankID routes in that app are not called.
+
+Uppsala Bostadsförmedling takes a password at `/mypages/api/account/login` and applies with the `createApplication` mutation. Registration stays with the user. The BankID endpoint is not called.
+
+SSSB is a WordPress password login for student housing. A captcha or a missing student certificate pauses the job and says the user is not eligible when the site says so.
+
+Qasa means a message to a private landlord. The app drafts it from the profile and the listing. The user edits it, copies it, and opens the listing. Nothing is posted to Qasa.
+
+These are not automated, on purpose:
+
+- Blocket Bostad. robots.txt forbids automated use without written permission.
+- Samtrygg. robots.txt disallows `/api`, `/Messages`, `/Chat` and `/Profile`. Applying is booking a viewing and chatting.
+- Akelius. The public rent site does not list Swedish cities. My Pages is a tenant portal.
+- Wallenstam and other HomeQ landlords, including Bostaden-linked ones. Their ads and applications go through the HomeQ adapter. The company name is on the listing.
+- Boplats Göteborg and Boplats Syd. Not in this change.
+
+A captcha, a 403 or a 429 pauses the job (`waiting_user`) and does not retry. A missing field pauses as "sidan har ändrats". Wrong password and a dead session pause as `needs_user`.
 
 Admin list endpoints return email, name, and connection status. They do not select the ciphertext or the wrapped key.

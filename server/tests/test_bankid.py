@@ -36,8 +36,11 @@ def _secret(user: User, login: LandlordLogin) -> dict:
 
 
 def test_flags_are_per_landlord():
-    assert landlords.requires_bankid("wahlin") is True
-    assert landlords.requires_bankid("stena") is True
+    assert landlords.requires_bankid("bostadsformedlingen") is True
+    assert landlords.requires_bankid("wahlin") is False
+    assert landlords.accepts_password("wahlin") is True
+    assert landlords.requires_bankid("stena") is False
+    assert landlords.accepts_password("stena") is True
     assert landlords.landlord("stena").name == "Stena Fastigheter"
     assert landlords.requires_bankid("homeq") is False
 
@@ -45,18 +48,18 @@ def test_flags_are_per_landlord():
 def test_bankid_landlord_pauses_without_storing_a_secret():
     db = Session()
     user = _user(db)
-    job = Job(user_id=user.id, source_id="stena", kind="create_account")
+    job = Job(user_id=user.id, source_id="bostadsformedlingen", kind="create_account")
     db.add(job)
     db.commit()
     run_job(db, job)
     db.commit()
-    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id="stena").one()
+    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id="bostadsformedlingen").one()
     assert job.status == "waiting_bankid"
     assert login.status == "needs_bankid"
     assert login.landlord_requires_bankid is True
     assert login.secret_ciphertext is None
     notice = db.query(Notice).filter_by(user_id=user.id).one()
-    assert "Stena Fastigheter" in notice.body
+    assert "Bostadsförmedlingen" in notice.body
     assert "inte hos Blixtbo" in notice.body
     assert "personal" not in notice.body.lower()
 
@@ -64,20 +67,20 @@ def test_bankid_landlord_pauses_without_storing_a_secret():
 def test_only_the_session_cookie_is_stored():
     db = Session()
     user = _user(db)
-    waiting = Job(user_id=user.id, source_id="wahlin", kind="create_account")
+    waiting = Job(user_id=user.id, source_id="bostadsformedlingen", kind="create_account")
     db.add(waiting)
     db.commit()
     run_job(db, waiting)
     db.commit()
     assert waiting.status == "waiting_bankid"
 
-    job = Job(user_id=user.id, source_id="wahlin", kind="store_session", payload='{"cookie":"ll-session=abc"}')
+    job = Job(user_id=user.id, source_id="bostadsformedlingen", kind="store_session", payload='{"cookie":"ll-session=abc"}')
     db.add(job)
     db.commit()
     run_job(db, job)
     db.commit()
     db.refresh(waiting)
-    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id="wahlin").one()
+    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id="bostadsformedlingen").one()
     assert job.status == "done"
     assert job.payload == "{}"
     assert waiting.status == "done"
@@ -95,21 +98,21 @@ def test_only_the_session_cookie_is_stored():
 def test_renewal_pauses_and_notifies_without_a_second_job():
     db = Session()
     user = _user(db)
-    created = Job(user_id=user.id, source_id="stena", kind="create_account")
+    created = Job(user_id=user.id, source_id="bostadsformedlingen", kind="create_account")
     db.add(created)
     db.commit()
     run_job(db, created)
-    stored = Job(user_id=user.id, source_id="stena", kind="store_session", payload='{"cookie":"sess=1"}')
+    stored = Job(user_id=user.id, source_id="bostadsformedlingen", kind="store_session", payload='{"cookie":"sess=1"}')
     db.add(stored)
     db.commit()
     run_job(db, stored)
-    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id="stena").one()
+    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id="bostadsformedlingen").one()
     login.next_renewal_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     db.commit()
     queue_due_renewals(db)
     queue_due_renewals(db)
     db.commit()
-    renewals = db.query(Job).filter_by(user_id=user.id, source_id="stena", kind="renew").all()
+    renewals = db.query(Job).filter_by(user_id=user.id, source_id="bostadsformedlingen", kind="renew").all()
     assert len(renewals) == 1
     run_job(db, renewals[0])
     db.commit()
@@ -120,7 +123,7 @@ def test_renewal_pauses_and_notifies_without_a_second_job():
     assert any("nytt BankID" in notice.body or "Nytt BankID" in notice.title for notice in db.query(Notice).all())
     queue_due_renewals(db)
     db.commit()
-    assert db.query(Job).filter_by(user_id=user.id, source_id="stena", kind="renew").count() == 1
+    assert db.query(Job).filter_by(user_id=user.id, source_id="bostadsformedlingen", kind="renew").count() == 1
 
 
 def test_password_landlord_still_stores_a_password():

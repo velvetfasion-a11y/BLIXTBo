@@ -3,13 +3,54 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, useState } from "react";
 import { canAutoApply } from "@/lib/billing";
 import { createDemo, createFreshUser, createLoggedOut, queueForSource, segmentMatches, welcomeNotice } from "@/lib/data";
+import { cloudReady, postJson, sendConfirmation } from "@/lib/landlord-api";
 import { signOutGoogle } from "@/lib/firebase/auth";
 import { pushState, type CloudState } from "@/lib/firebase/repository";
 import { cloudUid, setCloudSession } from "@/lib/firebase/session";
 import { hydrateCloud, scheduleCloudSync, watchAuth } from "@/lib/firebase/sync";
 import { applicationLimit, atApplicationLimit, isActiveApplication } from "@/lib/limits";
 import { completeness, queueAlert } from "@/lib/profile";
-import type { AppStatus, Billing, Connection, CustomLandlord, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, Source, User } from "@/lib/types";
+import type { AppStatus, Billing, Connection, CustomLandlord, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, QasaNote, Source, User } from "@/lib/types";
+
+function remoteListing(row: Record<string, unknown>): Listing {
+  const rent = Number(row.rent) || 0;
+  const floor = Number(row.floor) || 0;
+  return {
+    id: String(row.id),
+    address: String(row.address || "Bostad"),
+    area: String(row.area || ""),
+    city: String(row.city || ""),
+    rent,
+    sqm: Number(row.sqm) || 0,
+    rooms: Number(row.rooms) || 1,
+    floor,
+    floors: Number(row.floors) || Math.max(floor, 1),
+    moveIn: "",
+    ageMinutes: 5,
+    deadlineHours: null,
+    publishedAt: new Date().toISOString(),
+    deadlineAt: null,
+    sourceId: String(row.sourceId || ""),
+    photos: ["/photos/01.jpg"],
+    title: String(row.title || row.address || "Bostad"),
+    description: String(row.description || "Hämtad från hyresvärden."),
+    near: String(row.near || ""),
+    features: Array.isArray(row.features) ? row.features.map(String) : [],
+    requires: ["contract", "payslips", "letter"],
+    incomeMultiple: 3,
+    active: true,
+    sourceName: String(row.sourceName || ""),
+    externalId: String(row.externalId || ""),
+    listingUrl: String(row.url || ""),
+    bindingApply: Boolean(row.bindingApply),
+    messageApply: Boolean(row.messageApply),
+    objectAdId: String(row.objectAdId || ""),
+    lagenhetId: String(row.lagenhetId || ""),
+    annonsId: String(row.annonsId || ""),
+    refid: String(row.refid || ""),
+    qasaId: String(row.qasaId || ""),
+  };
+}
 
 const KEY = "blixtbo-v1";
 const SERVER_STATE = createLoggedOut(0);
@@ -39,6 +80,7 @@ function getSnapshot(): Persisted {
     const value = {
       ...parsed,
       waiting: parsed.waiting ?? [],
+      qasaNotes: parsed.qasaNotes ?? {},
       customLandlords: parsed.customLandlords ?? [],
       billing: parsed.billing ?? { plan: "free", status: "free", usedAutoApplies: 0 },
     };
@@ -112,7 +154,8 @@ type Store = Persisted & {
   setCityAreas: (areas: string[], on: boolean) => void;
   clearFilters: () => void;
   skip: (listingId: string) => void;
-  apply: (listingId: string, options?: { quiet?: boolean }) => { status: "applied"; position: number } | { status: "connected-needed" | "exists" | "missing" | "limit" | "paywall" };
+  apply: (listingId: string, options?: { quiet?: boolean; confirmation?: string }) => { status: "applied"; position: number; queued?: boolean } | { status: "connected-needed" | "exists" | "missing" | "limit" | "paywall" | "confirm" };
+  refreshLandlord: () => Promise<void>;
   setBilling: (billing: Billing) => void;
   deferListing: (listingId: string) => void;
   swapApplication: (applicationId: string, listingId: string) => void;
@@ -132,6 +175,7 @@ type Store = Persisted & {
   sendPush: (input: { title: string; body: string; segment: string }) => number;
   answerOffer: (applicationId: string, accept: boolean) => void;
   signContract: (applicationId: string) => void;
+  saveQasaNote: (listingId: string, patch: Partial<QasaNote>) => void;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -330,7 +374,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setToast(`Överhoppad · ${listing?.address ?? "bostaden"}`);
   }, []);
 
-  const apply = useCallback((listingId: string, options?: { quiet?: boolean }) => {
+  const apply = useCallback((listingId: string, options?: { quiet?: boolean; confirmation?: string }) => {
     const current = latest();
     if (!current) return { status: "missing" as const };
     const listing = current.listings.find((item) => item.id === listingId);
@@ -340,18 +384,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!connection || connection.status !== "connected") return { status: "connected-needed" as const };
     if (atApplicationLimit(current.sources, current.applications, current.listings, listing.sourceId)) return { status: "limit" as const };
     if (!listing.manualApply && !canAutoApply(current.billing)) return { status: "paywall" as const };
+    const source = current.sources.find((item) => item.id === listing.sourceId);
+    if (listing.sourceId === "qasa" || listing.messageApply) return { status: "confirm" as const };
+    const needed = sendConfirmation(source, listing);
+    const real = Boolean(source?.automated && current.user && !current.user.demo && cloudReady());
+    if (needed && !options?.confirmation) return { status: "confirm" as const };
     const published = new Date(listing.publishedAt).getTime();
     const minutesAfter = Math.max(0, Math.round((Date.now() - published) / 60000));
-    const position = minutesAfter < 15 ? 1 : minutesAfter < 60 ? 2 : minutesAfter < 180 ? 5 : 9;
+    const position = real ? 0 : minutesAfter < 15 ? 1 : minutesAfter < 60 ? 2 : minutesAfter < 180 ? 5 : 9;
     const id = `app-${Date.now()}`;
-    const source = current.sources.find((item) => item.id === listing.sourceId);
-    const note = position === 1 ? "Du var först att ansöka." : `Du var nummer ${position} att ansöka.`;
+    const note = real
+      ? "Ansökan är köad. Du får en notis när den är skickad."
+      : position === 1
+        ? "Du var först att ansöka."
+        : `Du var nummer ${position} att ansöka.`;
+    if (real) {
+      void postJson(`/listings/${encodeURIComponent(listing.id)}/apply`, {
+        source_id: listing.sourceId,
+        object_ad_id: listing.objectAdId || listing.externalId || "",
+        lagenhet_id: listing.lagenhetId || "",
+        annons_id: listing.annonsId || "",
+        refid: listing.refid || "",
+        qasa_id: listing.qasaId || "",
+        listing_url: listing.listingUrl || "",
+        confirmed: Boolean(options?.confirmation),
+        confirmation: options?.confirmation || "",
+      }).catch((error: Error) => {
+        setToast(error.message || "Ansökan gick inte att köa.");
+      });
+    }
     const notice: Notice | null = current.prefs.status
       ? {
           id,
           kind: "status",
-          title: "Ansökan skickad",
-          body: `${listing.address} · ${position === 1 ? "du var först" : `plats ${position}`}`,
+          title: real ? "Ansökan köad" : "Ansökan skickad",
+          body: real
+            ? `${listing.address} · köad hos ${source?.name ?? "hyresvärden"}`
+            : `${listing.address} · ${position === 1 ? "du var först" : `plats ${position}`}`,
           at: new Date().toISOString(),
           read: false,
           href: "/koll",
@@ -381,12 +450,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setUndo({ kind: "apply", listingId, applicationId: id });
     if (!options?.quiet) {
       setToast(
-        position === 1
-          ? `Ansökan skickad till ${source?.name ?? "hyresvärden"} · du var först`
-          : `Ansökan skickad till ${source?.name ?? "hyresvärden"} · plats ${position}`,
+        real
+          ? `Ansökan köad hos ${source?.name ?? "hyresvärden"}`
+          : position === 1
+            ? `Ansökan skickad till ${source?.name ?? "hyresvärden"} · du var först`
+            : `Ansökan skickad till ${source?.name ?? "hyresvärden"} · plats ${position}`,
       );
     }
-    return { status: "applied" as const, position };
+    return { status: "applied" as const, position, queued: real };
   }, []);
 
   const deferListing = useCallback((listingId: string) => {
@@ -739,6 +810,81 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return recipients;
   }, []);
 
+  const saveQasaNote = useCallback((listingId: string, patch: Partial<QasaNote>) => {
+    const current = latest();
+    if (!current) return;
+    const previous = current.qasaNotes[listingId] ?? { message: "", sent: false };
+    commit({
+      ...current,
+      qasaNotes: {
+        ...current.qasaNotes,
+        [listingId]: {
+          message: patch.message ?? previous.message,
+          sent: patch.sent ?? previous.sent,
+        },
+      },
+    });
+  }, []);
+
+  const refreshLandlord = useCallback(async () => {
+    const current = latest();
+    if (!current?.user || current.user.demo || !cloudReady()) return;
+    try {
+      const [connections, notices, listingBody] = await Promise.all([
+        postJson("/connections"),
+        postJson("/notices"),
+        postJson(
+          `/listings?areas=${encodeURIComponent(current.filters.areas.join(","))}&max_rent=${current.filters.maxRent}&rooms=${current.filters.rooms}&min_sqm=${current.filters.minSqm}&min_floor=${current.filters.minFloor}`,
+        ),
+      ]);
+      const fresh = latest();
+      if (!fresh) return;
+      const nextConnections = { ...fresh.connections };
+      for (const row of connections as { source_id: string; status: string; username?: string; last_error?: string | null }[]) {
+        const status =
+          row.status === "active"
+            ? "connected"
+            : row.status === "needs_bankid"
+              ? "needs_bankid"
+              : row.status === "needs_user"
+                ? "needs_user"
+                : "pending";
+        nextConnections[row.source_id] = {
+          sourceId: row.source_id,
+          status,
+          email: row.username || nextConnections[row.source_id]?.email,
+          detail: row.last_error || undefined,
+          bankIdSession: status === "needs_bankid" || status === "connected" && fresh.sources.find((item) => item.id === row.source_id)?.requiresBankId,
+        };
+      }
+      const remoteNotices = (notices as { id: string; title: string; body: string; read: boolean; at?: string }[]).map((notice) => ({
+        id: `api-${notice.id}`,
+        kind: "system" as const,
+        title: notice.title,
+        body: notice.body,
+        at: notice.at || new Date().toISOString(),
+        read: Boolean(notice.read),
+        href: "/notiser",
+      }));
+      const remoteIds = new Set(remoteNotices.map((notice) => notice.id));
+      const remoteListings = ((listingBody.listings || []) as Record<string, unknown>[]).map(remoteListing);
+      const covered = new Set(remoteListings.map((item) => item.sourceId));
+      commit({
+        ...fresh,
+        connections: nextConnections,
+        notifications: [...remoteNotices, ...fresh.notifications.filter((notice) => !remoteIds.has(notice.id))],
+        listings: covered.size ? [...remoteListings, ...fresh.listings.filter((item) => !covered.has(item.sourceId))] : fresh.listings,
+      });
+    } catch {
+      // The feed keeps the seed listings when the API is quiet.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!state?.user || state.user.demo) return;
+    void refreshLandlord();
+  }, [state?.user, state?.filters, refreshLandlord]);
+
   const undoAction = useCallback(() => {
     const current = latest();
     const action = undo;
@@ -806,6 +952,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       sendPush,
       answerOffer,
       signContract,
+      refreshLandlord,
+      saveQasaNote,
     };
   }, [
     state,
@@ -844,6 +992,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     sendPush,
     answerOffer,
     signContract,
+    refreshLandlord,
+    saveQasaNote,
   ]);
 
   return (

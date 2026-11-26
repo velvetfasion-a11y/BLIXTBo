@@ -3,8 +3,10 @@ services:
     build: .
     env_file: .env
     environment:
-      # The API serves users and the owner. It must not be able to unwrap login secrets.
+      # The API serves users and the owner. It must not be able to unwrap login secrets
+      # or open a sealed password. The public seal key, if set, comes from env_file.
       WORKER_KEK: ""
+      WORKER_SEAL_PRIVATE: ""
     ports:
       - "8080:8080"
     depends_on:
@@ -16,9 +18,10 @@ services:
     build: .
     env_file: .env
     environment:
-      # Admin SDK. FIREBASE_SERVICE_ACCOUNT and DATA_BACKEND come from env_file.
+      # Admin SDK. FIREBASE_SERVICE_ACCOUNT, DATA_BACKEND, WORKER_KEK and
+      # WORKER_SEAL_PRIVATE come from env_file. LANDLORD_MODE is not pinned here.
       # Set FIRESTORE_EMULATOR_HOST=host.docker.internal:8088 to use the emulator.
-      LANDLORD_MODE: dry-run
+      LANDLORD_MODE: ${LANDLORD_MODE:-dry-run}
     command: ["python", "-m", "blixtbo.scheduler"]
     depends_on:
       db:
