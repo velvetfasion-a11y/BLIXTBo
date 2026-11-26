@@ -832,6 +832,7 @@ export function createLoggedOut(now = Date.now()): Persisted {
   return {
     version: 1,
     user: null,
+    qasaNotes: {},
     filters: defaultFilters,
     connections: blankConnections(),
     applications: [],

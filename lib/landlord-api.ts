@@ -18,12 +18,14 @@ export async function authHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
+export function isQasaListing(source: Source | undefined, listing: Listing | undefined): boolean {
+  return listing?.sourceId === "qasa" || Boolean(listing?.messageApply) || source?.id === "qasa";
+}
+
 export function sendConfirmation(source: Source | undefined, listing: Listing | undefined): string | null {
+  if (isQasaListing(source, listing)) return null;
   if (source?.bindingApply || listing?.bindingApply || listing?.sourceId === "bostadsformedlingen") {
     return "Intresset blir bindande för den sökande med längst kötid när annonstiden tar slut.";
-  }
-  if (source?.messageApply || listing?.messageApply || listing?.sourceId === "qasa") {
-    return "Det här skickar ett meddelande till en privat hyresvärd med din profil.";
   }
   return null;
 }

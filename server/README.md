@@ -67,7 +67,7 @@ Uppsala Bostadsförmedling takes a password at `/mypages/api/account/login` and 
 
 SSSB is a WordPress password login for student housing. A captcha or a missing student certificate pauses the job and says the user is not eligible when the site says so.
 
-Qasa means a message to a private landlord. The app requires a per-listing confirmation. Qasa's robots.txt disallows `/*/messages`, and the public pages answer with a bot challenge, so the live worker does not POST the message. It pauses and tells the user to write it on Qasa. The send path is covered by fixtures where robots allows it.
+Qasa means a message to a private landlord. The app drafts it from the profile and the listing. The user edits it, copies it, and opens the listing. Nothing is posted to Qasa.
 
 These are not automated, on purpose:
 

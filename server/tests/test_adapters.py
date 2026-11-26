@@ -412,37 +412,26 @@ def test_stena_email_login_and_uppsala_password():
     assert wrong.error == "password_changed"
 
 
-def test_qasa_confirmation_robots_and_message():
-    calls = {"message": 0}
+def test_qasa_never_sends_a_message():
+    calls = {"any": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("/login") and request.method == "GET":
-            return httpx.Response(200, text='<form action="/session" method="post"><input name="email"><input name="password"></form>')
-        if request.url.path.endswith("/session"):
-            return httpx.Response(302, headers={"location": "/se/sv/find-home"})
+        calls["any"] += 1
         if request.url.path.endswith("/messages"):
-            calls["message"] += 1
             return httpx.Response(201, json={"ok": True})
-        return httpx.Response(404, text="missing")
+        return httpx.Response(200, text="ok")
 
-    paused = qasa.apply(_client(handler), {"username": "a@b.se", "password": "pw"}, {"qasa_id": "1"})
-    assert paused.error == "needs_confirmation"
-    assert calls["message"] == 0
+    client = _client(handler)
     blocked = qasa.apply(
-        _client(handler),
+        client,
         {"username": "a@b.se", "password": "pw"},
-        {"qasa_id": "1", "confirmed": True, "confirmation": "Skicka meddelandet med min profil"},
+        {"qasa_id": "1", "confirmed": True, "confirmation": "Skicka meddelandet med min profil", "message": "Hej"},
+        robots_text="User-agent: *\nAllow: /\n",
     )
-    assert blocked.pause and calls["message"] == 0
-    assert "själv" in blocked.body
-    allowed = qasa.ROBOTS.replace("Disallow: /*/messages", "Allow: /")
-    sent = qasa.apply(
-        _client(handler),
-        {"username": "a@b.se", "password": "pw"},
-        {"qasa_id": "1", "confirmed": True, "confirmation": "Skicka meddelandet med min profil"},
-        robots_text=allowed,
-    )
-    assert sent.error == "applied" and calls["message"] == 1
+    assert blocked.pause and blocked.error == "needs_confirmation"
+    assert calls["any"] == 0
+    assert "skickar inte" in blocked.body
+    assert "Klistra in och tryck Skicka" in blocked.body
 
     def challenge(request: httpx.Request) -> httpx.Response:
         return httpx.Response(429, text="just a moment")

@@ -233,9 +233,15 @@ export type Push = {
   recipients: number;
 };
 
+export type QasaNote = {
+  message: string;
+  sent: boolean;
+};
+
 export type Persisted = {
   version: 1;
   user: User | null;
+  qasaNotes: Record<string, QasaNote>;
   filters: Filters;
   connections: Record<string, Connection>;
   applications: Application[];

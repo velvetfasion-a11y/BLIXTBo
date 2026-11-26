@@ -12,7 +12,8 @@ import { ConnectSheet } from "@/components/connect-sheet";
 import { EmptyState, StatusPill } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDateTime, freshness, kr, rokShort } from "@/lib/format";
-import { sendConfirmation } from "@/lib/landlord-api";
+import { isQasaListing, sendConfirmation } from "@/lib/landlord-api";
+import { QasaSend } from "@/components/qasa-send";
 import { atApplicationLimit } from "@/lib/limits";
 import { assess, passesFilters } from "@/lib/profile";
 import { useStore } from "@/lib/store";
@@ -26,6 +27,7 @@ export function Feed() {
   const [limitId, setLimitId] = useState<string | null>(null);
   const [paywall, setPaywall] = useState(false);
   const [sendId, setSendId] = useState<string | null>(null);
+  const [qasaId, setQasaId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Hem · Blixtbo";
@@ -94,6 +96,11 @@ export function Feed() {
                 listings={deck}
                 onSkip={(id) => store.skip(id)}
                 onYes={(listing) => {
+                  const source = store.sources.find((item) => item.id === listing.sourceId);
+                  if (isQasaListing(source, listing)) {
+                    setQasaId(listing.id);
+                    return false;
+                  }
                   const connected = store.connections[listing.sourceId]?.status === "connected";
                   if (listing.manualApply) return false;
                   if (!connected) {
@@ -113,7 +120,6 @@ export function Feed() {
                     setConfirmId(listing.id);
                     return false;
                   }
-                  const source = store.sources.find((item) => item.id === listing.sourceId);
                   if (sendConfirmation(source, listing)) {
                     setSendId(listing.id);
                     return false;
@@ -149,16 +155,7 @@ export function Feed() {
         listing={store.listings.find((item) => item.id === confirmId) ?? null}
         onClose={() => setConfirmId(null)}
         onSend={() => {
-          if (!confirmId) return;
-          const listing = store.listings.find((item) => item.id === confirmId);
-          const source = store.sources.find((item) => item.id === listing?.sourceId);
-          const text = sendConfirmation(source, listing);
-          if (text) {
-            setSendId(confirmId);
-            setConfirmId(null);
-            return;
-          }
-          store.apply(confirmId);
+          if (confirmId) store.apply(confirmId);
           setConfirmId(null);
         }}
       />
@@ -177,6 +174,11 @@ export function Feed() {
           if (sendId && text) store.apply(sendId, { confirmation: text });
           setSendId(null);
         }}
+      />
+      <QasaSend
+        listing={store.listings.find((item) => item.id === qasaId) ?? null}
+        open={Boolean(qasaId)}
+        onClose={() => setQasaId(null)}
       />
     </div>
   );

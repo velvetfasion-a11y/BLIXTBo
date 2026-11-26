@@ -10,7 +10,7 @@ import { cloudUid, setCloudSession } from "@/lib/firebase/session";
 import { hydrateCloud, scheduleCloudSync, watchAuth } from "@/lib/firebase/sync";
 import { applicationLimit, atApplicationLimit, isActiveApplication } from "@/lib/limits";
 import { completeness, queueAlert } from "@/lib/profile";
-import type { AppStatus, Billing, Connection, CustomLandlord, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, Source, User } from "@/lib/types";
+import type { AppStatus, Billing, Connection, CustomLandlord, Filters, Listing, Notice, Persisted, Prefs, Profile, Push, QasaNote, Source, User } from "@/lib/types";
 
 function remoteListing(row: Record<string, unknown>): Listing {
   const rent = Number(row.rent) || 0;
@@ -80,6 +80,7 @@ function getSnapshot(): Persisted {
     const value = {
       ...parsed,
       waiting: parsed.waiting ?? [],
+      qasaNotes: parsed.qasaNotes ?? {},
       customLandlords: parsed.customLandlords ?? [],
       billing: parsed.billing ?? { plan: "free", status: "free", usedAutoApplies: 0 },
     };
@@ -174,6 +175,7 @@ type Store = Persisted & {
   sendPush: (input: { title: string; body: string; segment: string }) => number;
   answerOffer: (applicationId: string, accept: boolean) => void;
   signContract: (applicationId: string) => void;
+  saveQasaNote: (listingId: string, patch: Partial<QasaNote>) => void;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -383,6 +385,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (atApplicationLimit(current.sources, current.applications, current.listings, listing.sourceId)) return { status: "limit" as const };
     if (!listing.manualApply && !canAutoApply(current.billing)) return { status: "paywall" as const };
     const source = current.sources.find((item) => item.id === listing.sourceId);
+    if (listing.sourceId === "qasa" || listing.messageApply) return { status: "confirm" as const };
     const needed = sendConfirmation(source, listing);
     const real = Boolean(source?.automated && current.user && !current.user.demo && cloudReady());
     if (needed && !options?.confirmation) return { status: "confirm" as const };
@@ -807,6 +810,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return recipients;
   }, []);
 
+  const saveQasaNote = useCallback((listingId: string, patch: Partial<QasaNote>) => {
+    const current = latest();
+    if (!current) return;
+    const previous = current.qasaNotes[listingId] ?? { message: "", sent: false };
+    commit({
+      ...current,
+      qasaNotes: {
+        ...current.qasaNotes,
+        [listingId]: {
+          message: patch.message ?? previous.message,
+          sent: patch.sent ?? previous.sent,
+        },
+      },
+    });
+  }, []);
+
   const refreshLandlord = useCallback(async () => {
     const current = latest();
     if (!current?.user || current.user.demo || !cloudReady()) return;
@@ -934,6 +953,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       answerOffer,
       signContract,
       refreshLandlord,
+      saveQasaNote,
     };
   }, [
     state,
@@ -973,6 +993,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     answerOffer,
     signContract,
     refreshLandlord,
+    saveQasaNote,
   ]);
 
   return (

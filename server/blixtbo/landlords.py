@@ -253,17 +253,19 @@ def _needs_confirmation(site: Landlord, payload: dict) -> StepResult | None:
     text = str(payload.get("confirmation") or "")
     if payload.get("confirmed") and text.strip():
         return None
+    if site.message_apply:
+        return paused(
+            "needs_confirmation",
+            "Skicka själv på Qasa",
+            "Blixtbo skickar inte meddelanden till Qasa. Kopiera texten i appen, öppna annonsen och tryck Skicka.",
+        )
     if site.binding_apply:
         return paused(
             "needs_confirmation",
             "Bekräfta intresseanmälan",
             "Intresset blir bindande för den sökande med längst kötid när annonstiden tar slut. Inget skickades.",
         )
-    return paused(
-        "needs_confirmation",
-        "Bekräfta meddelandet",
-        "Det här skickar ett meddelande till en privat hyresvärd med din profil. Inget skickades.",
-    )
+    return None
 
 
 def run_login(source_id: str, secret: dict) -> StepResult:

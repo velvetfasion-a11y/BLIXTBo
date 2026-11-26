@@ -13,7 +13,8 @@ import { asset } from "@/lib/asset";
 import { deadlineLabel, floorLabel, formatDate, freshness, kr, rok } from "@/lib/format";
 import { canAutoApply } from "@/lib/billing";
 import { Paywall } from "@/components/paywall";
-import { sendConfirmation } from "@/lib/landlord-api";
+import { isQasaListing, sendConfirmation } from "@/lib/landlord-api";
+import { QasaSend } from "@/components/qasa-send";
 import { atApplicationLimit } from "@/lib/limits";
 import { assess } from "@/lib/profile";
 import { useStore } from "@/lib/store";
@@ -29,6 +30,7 @@ function ListingInner() {
   const [limited, setLimited] = useState(false);
   const [paywall, setPaywall] = useState(false);
   const [sendConfirm, setSendConfirm] = useState(false);
+  const [qasaOpen, setQasaOpen] = useState(false);
 
   useEffect(() => {
     document.title = listing ? `${listing.address} · Blixtbo` : "Bostad · Blixtbo";
@@ -50,6 +52,10 @@ function ListingInner() {
   const result = assess(listing, store.user?.profile ?? null);
 
   function apply() {
+    if (isQasaListing(source, listing)) {
+      setQasaOpen(true);
+      return;
+    }
     if (!connected) {
       setGate(true);
       return;
@@ -72,6 +78,8 @@ function ListingInner() {
     }
     store.apply(listing!.id);
   }
+
+  const qasaSent = Boolean(store.qasaNotes[listing.id]?.sent);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5 md:px-8 md:py-8">
@@ -142,7 +150,16 @@ function ListingInner() {
           <p className="text-sm text-soft">
             Källa: {source?.name}. {connected ? "Kontot är kopplat." : "Kontot är inte kopplat ännu."}
           </p>
-          {store.waiting.some((item) => item.listingId === listing.id) ? (
+          {isQasaListing(source, listing) ? (
+            <div className="space-y-3">
+              {qasaSent ? (
+                <div className="rounded-2xl bg-pine-soft px-4 py-4 text-sm text-pine-deep">Skickad? Ja. Du skickade meddelandet själv på Qasa.</div>
+              ) : null}
+              <Button size="lg" variant="pine" className="h-12 w-full" onClick={() => setQasaOpen(true)}>
+                Skriv till hyresvärden
+              </Button>
+            </div>
+          ) : store.waiting.some((item) => item.listingId === listing.id) ? (
             <div className="rounded-2xl bg-paper px-4 py-4 text-sm leading-relaxed text-soft">
               Sparad i Väntar på plats. Du får en notis när en ansökan hos {source?.name ?? "hyresvärden"} avslutas.
             </div>
@@ -158,7 +175,7 @@ function ListingInner() {
                 </a>
               ) : (
                 <Button size="lg" variant="pine" className="h-12 w-full shrink-0 sm:flex-1" onClick={apply}>
-                  {connected ? "Ansök nu" : `Koppla ${source?.name ?? "källan"} och ansök`}
+                  {isQasaListing(source, listing) ? "Skriv till hyresvärden" : connected ? "Ansök nu" : `Koppla ${source?.name ?? "källan"} och ansök`}
                 </Button>
               )}
               <Button size="lg" variant="outline" className="h-12 w-full shrink-0 sm:w-auto" onClick={() => { store.skip(listing.id); router.push("/hem"); }}>
@@ -184,11 +201,6 @@ function ListingInner() {
         listing={confirm ? listing : null}
         onClose={() => setConfirm(false)}
         onSend={() => {
-          if (sendConfirmation(source, listing)) {
-            setConfirm(false);
-            setSendConfirm(true);
-            return;
-          }
           store.apply(listing.id);
           setConfirm(false);
         }}
@@ -204,6 +216,7 @@ function ListingInner() {
           setSendConfirm(false);
         }}
       />
+      <QasaSend listing={listing} open={qasaOpen} onClose={() => setQasaOpen(false)} />
     </div>
   );
 }
