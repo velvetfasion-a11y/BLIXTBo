@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     support_ticket_limit: int = 5
     support_chat_limit: int = 20
+    apple_bundle_id: str = "se.blixtbo.app"
+    apple_product_id: str = "se.blixtbo.premium.monthly"
+    # 0 skips the check. Production should set the numeric App Store app id.
+    apple_app_apple_id: int = 0
+    apple_root_cert_path: str = ""
+    apns_key_id: str = ""
+    apns_team_id: str = ""
+    # PEM contents, or a path to the AuthKey .p8. Empty means push is stored but not sent.
+    apns_key_p8: str = ""
+    apns_use_sandbox: bool = True
 
     def kek_bytes(self) -> bytes:
         if not self.worker_kek:

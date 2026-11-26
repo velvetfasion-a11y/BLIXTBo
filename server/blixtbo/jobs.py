@@ -7,6 +7,7 @@ the user's DEK, and replaces the job payload with {}. Plaintext is not stored.
 
 import json
 import secrets
+import uuid
 from datetime import datetime, timezone
 
 from blixtbo import crypto, landlords
@@ -31,7 +32,14 @@ APPLY_KEYS = (
 
 
 def _notify(db, user_id: str, kind: str, title: str, body: str) -> None:
-    db.add(Notice(user_id=user_id, kind=kind[:80], title=title[:160], body=body))
+    row = Notice(id=str(uuid.uuid4()), user_id=user_id, kind=kind[:80], title=title[:160], body=body)
+    db.add(row)
+    try:
+        from blixtbo.push import notify_user
+
+        notify_user(db, user_id, row.id, row.kind, row.title, row.body)
+    except Exception as exc:
+        print(f"blixtbo push skipped: {exc}", flush=True)
 
 
 def _secret_for(user: User, login: LandlordLogin) -> dict:
