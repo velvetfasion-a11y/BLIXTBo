@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Fraunces } from "next/font/google";
+import { JsonLd } from "@/components/json-ld";
 import { StoreProvider } from "@/lib/store";
+import { HOME_DESCRIPTION, HOME_TITLE, organizationJsonLd } from "@/lib/seo";
 import "./globals.css";
 
 const sans = Familjen_Grotesk({
@@ -17,8 +19,26 @@ const serif = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Blixtbo",
-  description: "Var först på varje ny hyreslägenhet. Håll koll på ansökningar och köer.",
+  metadataBase: new URL("https://blixtbo.se"),
+  title: {
+    default: HOME_TITLE,
+    template: "%s | Blixtbo",
+  },
+  description: HOME_DESCRIPTION,
+  applicationName: "Blixtbo",
+  openGraph: {
+    type: "website",
+    locale: "sv_SE",
+    siteName: "Blixtbo",
+    url: "/",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {
@@ -31,6 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="sv" className={`${sans.variable} ${serif.variable} h-full antialiased`}>
       <body className="min-h-full bg-paper font-sans text-ink">
+        <JsonLd data={organizationJsonLd()} />
         <StoreProvider>{children}</StoreProvider>
       </body>
     </html>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FaqList } from "@/components/faq-list";
 import { SiteFooter } from "@/components/site-footer";
 import { Wordmark } from "@/components/mark";
 import { premiumPriceKr, trialDays } from "@/lib/billing";
@@ -24,6 +25,15 @@ export function Help() {
             Till inställningar
           </Link>
         </div>
+
+        <section className="mt-10" aria-labelledby="vanliga-fragor">
+          <h2 id="vanliga-fragor" className="font-serif text-2xl tracking-[-0.03em]">
+            Vanliga frågor
+          </h2>
+          <div className="mt-4">
+            <FaqList />
+          </div>
+        </section>
 
         <section className="mt-10">
           <h2 className="font-serif text-2xl tracking-[-0.03em]">Hur Blixtbo fungerar</h2>
