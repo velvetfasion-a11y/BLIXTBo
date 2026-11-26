@@ -59,17 +59,29 @@ export function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="mt-auto rounded-2xl bg-card px-3 py-3">
-          <p className="flex items-center gap-2 text-sm font-medium">
-            <span className="h-2 w-2 rounded-full bg-pine" />
-            Bevakning på
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-soft">{sourcesOn} hyresvärdar bevakas just nu.</p>
+        <div className="mt-auto">
+          <div className="rounded-2xl bg-card px-3 py-3">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <span className="h-2 w-2 rounded-full bg-pine" />
+              Bevakning på
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-soft">{sourcesOn} hyresvärdar bevakas just nu.</p>
+          </div>
+          <footer className="mt-4 px-3 pb-2">
+            <Link href="/hjalp" className="text-sm font-medium text-soft hover:text-ink">
+              Hjälp
+            </Link>
+          </footer>
         </div>
       </aside>
-      <div className="pb-24 md:pb-0">{children}</div>
+      <div className="pb-28 md:pb-0">{children}</div>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/92 backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-4 px-2 pt-2 pb-[max(0.55rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-lg justify-center pt-2">
+          <Link href="/hjalp" className="text-xs font-medium text-soft">
+            Hjälp
+          </Link>
+        </div>
+        <div className="mx-auto grid max-w-lg grid-cols-4 px-2 pt-1 pb-[max(0.55rem,env(safe-area-inset-bottom))]">
           {TABS.map((tab) => {
             const active = path === tab.href;
             const Icon = tab.icon;

@@ -8,7 +8,7 @@ export function cx(...parts: Array<string | false | null | undefined>) {
 }
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "pine" | "outline" | "ghost" | "soft";
+  variant?: "primary" | "pine" | "outline" | "ghost" | "soft" | "danger";
   size?: "sm" | "md" | "lg";
 };
 
@@ -26,6 +26,7 @@ export function Button({ variant = "primary", size = "md", className, type = "bu
         variant === "outline" && "border border-line bg-card text-ink hover:bg-paper",
         variant === "ghost" && "text-ink hover:bg-black/5",
         variant === "soft" && "bg-paper-deep text-ink hover:bg-[#ddd4c6]",
+        variant === "danger" && "bg-danger text-white hover:bg-[#732826]",
         className,
       )}
       {...props}

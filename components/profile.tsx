@@ -50,6 +50,7 @@ export function Profile() {
         <Row href="/guide?steg=dokument" title="Dokument" detail="Avtal, lönespecifikationer, personbevis" />
         <Row href="/filter" title="Filter" detail="Område, hyra, storlek, inflytt" />
         <Row href="/kopplingar" title="Hyresvärdar" detail={`${connected} kopplade`} />
+        <Row href="/installningar" title="Inställningar" detail="Prenumeration, hjälp och konto" />
       </ul>
 
       <SubscriptionCard preview={previewPause} />
