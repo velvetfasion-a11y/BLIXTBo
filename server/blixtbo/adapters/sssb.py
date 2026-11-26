@@ -28,11 +28,15 @@ def _headers(cookie: str = "") -> dict[str, str]:
     return headers
 
 
-def login(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+def login(client: httpx.Client, secret: dict, guard: SiteGuard | None = None, *, keepalive: bool = False) -> StepResult:
     try:
         page = request(client, "GET", LOGIN_PAGE, guard, follow_redirects=False)
     except RobotsBlocked:
         return paused("captcha", "SSSB tillåter inte anropet", "Robots.txt spärrar inloggningen. Inget skickades.")
+    if keepalive and page.status_code >= 500:
+        return paused("unreachable", "Vi når inte SSSB just nu", "Vi försöker igen senare.")
+    if keepalive and page.status_code == 429:
+        return paused("rate_limited", "SSSB vill att du tar över", "SSSB ber oss vänta. Vi försöker inte igen nu.")
     if captcha(page.status_code, page.text):
         return paused("captcha", "SSSB vill att du tar över", "SSSB visar en kontroll. Logga in själv och klistra in sessionen. Vi försöker inte igen.")
     if not has_field(page.text, USER_FIELD) or not has_field(page.text, PASS_FIELD):
@@ -54,6 +58,10 @@ def login(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) ->
         )
     except RobotsBlocked:
         return paused("captcha", "SSSB tillåter inte anropet", "Inget skickades.")
+    if keepalive and sent.status_code >= 500:
+        return paused("unreachable", "Vi når inte SSSB just nu", "Vi försöker igen senare.")
+    if keepalive and sent.status_code == 429:
+        return paused("rate_limited", "SSSB vill att du tar över", "SSSB ber oss vänta. Vi försöker inte igen nu.")
     if captcha(sent.status_code, sent.text):
         return paused("captcha", "SSSB vill att du tar över", "SSSB visar en kontroll efter inloggningen. Vi försöker inte igen.")
     lowered = sent.text.lower()
@@ -131,6 +139,35 @@ def apply(client: httpx.Client, secret: dict, payload: dict, guard: SiteGuard | 
     if not signed.ok:
         return signed
     return _interest(client, payload, guard)
+
+
+def keepalive(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+    """WordPress login, then a read-only GET of lediga bostäder. No interest form."""
+    signed = login(client, secret, guard, keepalive=True)
+    if not signed.ok:
+        return signed
+    try:
+        page = request(client, "GET", ORIGIN + "/lediga-bostader/", guard, follow_redirects=False)
+    except RobotsBlocked:
+        return paused("captcha", "SSSB vill att du tar över", "Robots.txt spärrar sidan. Inget mer skickades.")
+    except httpx.TransportError:
+        return paused("unreachable", "Vi når inte SSSB just nu", "Vi försöker igen senare.")
+    if page.status_code >= 500:
+        return paused("unreachable", "Vi når inte SSSB just nu", "Vi försöker igen senare.")
+    if page.status_code == 429:
+        return paused("rate_limited", "SSSB vill att du tar över", "SSSB ber oss vänta. Vi försöker inte igen nu.")
+    if captcha(page.status_code, page.text):
+        return paused("captcha", "SSSB vill att du tar över", "SSSB visar en kontroll. Vi försöker inte igen.")
+    if page.status_code in (401, 403) or "wp-login" in (page.headers.get("location") or ""):
+        return paused("session_expired", "Inloggningen hos SSSB har gått ut", "Logga in en gång till.")
+    lowered = (signed.body + " " + page.text).lower()
+    if "parkerad" in lowered or "parkera kontot" in lowered or ("medlemskap" in lowered and ("saknas" in lowered or "upphört" in lowered)):
+        return paused(
+            "parked",
+            "SSSB behöver ditt medlemskap",
+            "Köplatsen hos SSSB följer medlemskapet. Parkera kontot eller visa att du studerar. Blixtbo gör inte det åt dig.",
+        )
+    return finished("SSSB är kollat", "Inloggningen hos SSSB fungerar.", "queue_ok")
 
 
 def renew(client: httpx.Client, secret: dict, payload: dict, guard: SiteGuard | None = None) -> StepResult:

@@ -157,13 +157,24 @@ def open_sealed(blob: str) -> dict:
     return opened
 
 
+def _iso(value) -> str | None:
+    if not value:
+        return None
+    return value.isoformat()
+
+
 def public_connection(row) -> dict:
     """Fields an admin or the app may see. Never the secret."""
     return {
         "source_id": row.source_id,
         "status": row.status,
         "username": row.username,
-        "last_login_at": row.last_login_at.isoformat() if row.last_login_at else None,
+        "last_login_at": _iso(getattr(row, "last_login_at", None)),
         "last_error": row.last_error,
         "landlord_requires_bankid": row.landlord_requires_bankid,
+        "last_kept_alive_at": _iso(getattr(row, "last_kept_alive_at", None)),
+        "keepalive_state": getattr(row, "keepalive_state", None),
+        "next_keepalive_at": _iso(getattr(row, "next_keepalive_at", None)),
+        "fee_due_at": _iso(getattr(row, "fee_due_at", None)),
+        "last_keepalive_code": getattr(row, "last_keepalive_code", None),
     }

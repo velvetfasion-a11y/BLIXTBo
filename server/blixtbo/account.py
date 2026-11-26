@@ -19,7 +19,7 @@ from blixtbo.models import Approval, AuditLog, DeletionJournal, Job, LandlordLog
 CONFIRMATION = "RADERA"
 RECENT_LOGIN_SECONDS = 5 * 60
 SCOPES = ("account", "erasure", "links")
-LINK_JOBS = ("store_session", "create_account", "renew")
+LINK_JOBS = ("store_session", "create_account", "renew", "keepalive")
 _UID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _TOMBSTONE_DOMAIN = "@deleted.blixtbo.invalid"
 _STRIPE_DOMAIN = "@anonymised.invalid"

@@ -61,6 +61,26 @@ def apply(client: httpx.Client, source_id: str, secret: dict, payload: dict, gua
     return paused("site_changed", "Hyresvärden saknar adapter", "Ansökan skickades inte.")
 
 
+def keepalive(client: httpx.Client, source_id: str, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+    """Read-only keep-alive. Qasa, Akelius and the fee queues make no request."""
+    source_id = canonical(source_id)
+    if source_id in ("qasa", "akelius", "bostadsformedlingen", "boplats", "boplatssyd", "wallenstam"):
+        return finished("Hoppas över", "Inget anrop görs.", "skipped")
+    if source_id == "homeq":
+        return homeq.keepalive(client, secret, guard)
+    if source_id in incit.SITES:
+        return incit.keepalive(client, source_id, secret, guard)
+    if source_id == "rikshem":
+        return rikshem.keepalive(client, secret, guard)
+    if source_id == "stena":
+        return stena.keepalive(client, secret, guard)
+    if source_id == "uppsala":
+        return uppsala.keepalive(client, secret, guard)
+    if source_id == "sssb":
+        return sssb.keepalive(client, secret, guard)
+    return finished("Hoppas över", "Inget anrop görs.", "skipped")
+
+
 def renew(client: httpx.Client, source_id: str, secret: dict, payload: dict, guard: SiteGuard | None = None) -> StepResult:
     source_id = canonical(source_id)
     if source_id == "homeq":

@@ -35,7 +35,7 @@ app = FastAPI(title="Blixtbo", docs_url=None, redoc_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:43123", "http://localhost:43123"],
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["POST", "GET", "PUT", "OPTIONS"],
     allow_headers=["*"],
 )
 serializer = URLSafeTimedSerializer(settings.app_secret, salt="blixtbo-session")
@@ -585,10 +585,40 @@ def save_session(source_id: str, body: dict, user: User = Depends(require_user),
     return {"queued": True, "source_id": source_id}
 
 
+@app.put("/connections/{source_id}/fee-due")
+def set_fee_due(source_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    """The user types the queue-fee date. We never guess it and we never pay it."""
+    from blixtbo.keepalive import effective_strategy, parse_fee_date
+
+    if effective_strategy(source_id) != "fee_reminder":
+        raise HTTPException(status_code=400, detail="Den här hyresvärden har ingen köavgift att påminna om.")
+    try:
+        due = parse_fee_date((body or {}).get("date"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Skriv datumet som ÅÅÅÅ-MM-DD.")
+    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id=source_id).one_or_none()
+    if login is None:
+        raise HTTPException(status_code=404, detail="Ingen koppling.")
+    login.fee_due_at = due
+    login.keepalive_state = "fee_due"
+    db.commit()
+    return public_connection(login)
+
+
 @app.get("/connections")
 def list_connections(user: User = Depends(require_user), db: Session = Depends(get_db)) -> list:
+    from blixtbo.keepalive import effective_strategy, latest_notice_title
+
     rows = db.query(LandlordLogin).filter_by(user_id=user.id).all()
-    return [public_connection(row) for row in rows]
+    views = []
+    for row in rows:
+        view = public_connection(row)
+        view["keepalive_strategy"] = effective_strategy(row.source_id, row)
+        notice = latest_notice_title(db, user.id, row.source_id)
+        if notice:
+            view["keepalive_notice"] = notice
+        views.append(view)
+    return views
 
 
 @app.get("/notices")
@@ -602,6 +632,10 @@ def list_notices(user: User = Depends(require_user), db: Session = Depends(get_d
             "body": row.body,
             "read": row.read,
             "at": row.created_at.isoformat() if row.created_at else None,
+            "action_label": row.action_label or "",
+            "action_href": row.action_href or "",
+            "secondary_label": row.secondary_label or "",
+            "secondary_href": row.secondary_href or "",
         }
         for row in rows
     ]
