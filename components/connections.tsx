@@ -34,19 +34,24 @@ function keepaliveLine(link: Connection | undefined): string | null {
 export function Connections() {
   const store = useStore();
   const params = useSearchParams();
-  const [sheet, setSheet] = useState<{ id: string; intent: "login" | "signup" } | null>(null);
+  const querySource = params.get("source");
+  const intentParam = params.get("intent");
+  const requested: { id: string; intent: "login" | "signup" } | null =
+    querySource && (intentParam === "login" || intentParam === "signup") ? { id: querySource, intent: intentParam } : null;
+  const requestKey = requested ? `${requested.id}:${requested.intent}` : "";
+  const [sheet, setSheet] = useState(requested);
+  const [seenRequest, setSeenRequest] = useState(requestKey);
+
+  if (requestKey && requestKey !== seenRequest) {
+    setSeenRequest(requestKey);
+    setSheet(requested);
+  } else if (!requestKey && seenRequest) {
+    setSeenRequest("");
+  }
 
   useEffect(() => {
     document.title = "Hyresvärdar · Blixtbo";
   }, []);
-
-  useEffect(() => {
-    const source = params.get("source");
-    const intent = params.get("intent");
-    if (source && (intent === "login" || intent === "signup")) {
-      setSheet({ id: source, intent });
-    }
-  }, [params]);
 
   const builtin = store.sources.filter((source) => !store.customLandlords.some((item) => item.id === source.id));
   const connected = builtin.filter((source) => store.connections[source.id]?.status === "connected").length;
@@ -148,12 +153,15 @@ export function Connections() {
 }
 
 function FeeDate({ sourceId, value, focus }: { sourceId: string; value?: string | null; focus: boolean }) {
-  const [date, setDate] = useState(value ? value.slice(0, 10) : "");
+  const incoming = value ? value.slice(0, 10) : "";
+  const [date, setDate] = useState(incoming);
+  const [seenValue, setSeenValue] = useState(incoming);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    setDate(value ? value.slice(0, 10) : "");
-  }, [value]);
+  if (incoming !== seenValue) {
+    setSeenValue(incoming);
+    setDate(incoming);
+  }
 
   async function save() {
     setMessage("");
