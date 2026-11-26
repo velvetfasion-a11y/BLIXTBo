@@ -1,19 +1,10 @@
 "use client";
 
 import { useEffect, useState, type ComponentType } from "react";
+import { AuthCardSkeleton } from "@/components/auth-card";
 
 function SignInPlaceholder() {
-  return (
-    <div className="min-h-48" aria-busy="true">
-      <p className="text-sm text-soft" role="status">
-        Laddar inloggning…
-      </p>
-      <div className="mt-3 flex flex-col gap-3" aria-hidden>
-        <div className="h-12 rounded-full border border-line bg-white" />
-        <div className="h-12 rounded-full border border-line bg-white" />
-      </div>
-    </div>
-  );
+  return <AuthCardSkeleton />;
 }
 
 function afterWindowLoad(run: () => void) {

@@ -19,10 +19,10 @@ export function Landing({ signIn }: { signIn: React.ReactNode }) {
               {HOME_H1}
             </h1>
             <p className="mt-5 max-w-lg text-base leading-relaxed text-soft sm:text-lg">{HOME_SUBLINE}</p>
+            <div className="mt-8 w-full max-w-[400px]">{signIn}</div>
             <div className="mt-8">
               <LandlordLogoCloud />
             </div>
-            <div className="mt-8 sm:max-w-sm">{signIn}</div>
           </div>
         </div>
         <div className="relative hidden overflow-hidden bg-[#e7e0d4] lg:block">
