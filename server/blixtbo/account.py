@@ -159,6 +159,11 @@ class FirestoreGateway:
             return
         _purge_ref(client.collection("credentials").document(uid))
 
+    def delete_reviews(self, uid: str) -> None:
+        from blixtbo.reviews import delete_firestore_reviews
+
+        delete_firestore_reviews(uid)
+
 
 def _purge_ref(ref) -> None:
     for collection in ref.collections():
@@ -335,8 +340,12 @@ def run_deletion(db: Session, *, uid: str, email: str, scope: str, stripe: Strip
 
 
 def _delete_account(db: Session, journal: DeletionJournal, user: User | None, uid: str, firestore: FirestoreGateway) -> dict:
-    # Identity in Firestore first. If that fails, the Postgres account is still intact.
+    # Reviews and the Firestore identity go first. If that fails, the Postgres account is still intact.
+    from blixtbo.reviews import delete_sql_reviews
+
+    firestore.delete_reviews(uid)
     firestore.clear_account(uid)
+    delete_sql_reviews(db, user_id=user.id if user is not None else "", firebase_uid=uid)
     if user is not None and user.auth_method != "deleted":
         _tombstone(user)
     _finish(journal)
@@ -389,6 +398,9 @@ def _erase(
             stripe.anonymise(located["customerId"])
             stripe_state = "anonymised"
         emails = _log_emails(db, uid, email, user)
+        from blixtbo.reviews import delete_sql_reviews
+
+        delete_sql_reviews(db, user_id=user.id if user is not None else "", firebase_uid=uid)
         if user is not None:
             _delete_children(db, user, jobs="all")
             if emails:

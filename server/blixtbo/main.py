@@ -7,7 +7,7 @@ import httpx
 import pyotp
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy.orm import Session
 
@@ -35,7 +35,7 @@ app = FastAPI(title="Blixtbo", docs_url=None, redoc_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:43123", "http://localhost:43123"],
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["POST", "PUT", "GET", "OPTIONS"],
     allow_headers=["*"],
 )
 serializer = URLSafeTimedSerializer(settings.app_secret, salt="blixtbo-session")
@@ -720,3 +720,67 @@ def admin_users(owner: User = Depends(require_owner), db: Session = Depends(get_
     audit(db, owner.email, "admin.users")
     rows = db.query(User).order_by(User.created_at.desc()).limit(200).all()
     return [{"id": row.id, "email": row.email, "name": row.name, "method": row.auth_method} for row in rows]
+
+
+def _review_error(exc):
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@app.get("/reviews")
+def reviews_mine(user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, list_my_reviews
+
+    try:
+        return {"reviews": list_my_reviews(db, user)}
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.post("/reviews")
+def reviews_create(body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, create_review
+
+    try:
+        return create_review(db, user, body)
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.put("/reviews/{application_id}")
+def reviews_update(application_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, update_review
+
+    try:
+        return update_review(db, user, application_id, body)
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.get(settings.admin_path + "/reviews.csv")
+def reviews_admin_csv(rating: str | None = None, owner: User = Depends(require_owner), db: Session = Depends(get_db)) -> Response:
+    from blixtbo.reviews import ReviewError, admin_reviews_csv
+
+    try:
+        body = admin_reviews_csv(db, rating)
+    except ReviewError as exc:
+        _review_error(exc)
+    audit(db, owner.email, "admin.reviews.csv", rating or "")
+    return Response(
+        content=body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="recensioner.csv"'},
+    )
+
+
+@app.get(settings.admin_path + "/reviews")
+def reviews_admin(rating: str | None = None, owner: User = Depends(require_owner), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, admin_reviews
+
+    try:
+        payload = admin_reviews(db, rating)
+    except ReviewError as exc:
+        _review_error(exc)
+    audit(db, owner.email, "admin.reviews", rating or "")
+    return payload

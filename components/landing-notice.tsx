@@ -6,12 +6,12 @@ import { useStore } from "@/lib/store";
 
 function noticeText(kind: string) {
   if (kind === "uppgifter") {
-    return "Uppgifterna om dig är raderade och du är utloggad. Stripe-kunden är anonymiserad. Fakturor och betalunderlag behålls enligt bokföringslagen.";
+    return "Uppgifterna om dig, inklusive recensioner, är raderade och du är utloggad. Stripe-kunden är anonymiserad. Fakturor och betalunderlag behålls enligt bokföringslagen.";
   }
   if (kind === "exempel") {
     return "Exempelkontot fanns bara i den här webbläsaren och är borttaget. Inget konto i molnet berördes.";
   }
-  return "Blixtbo-kontot är stängt och du är utloggad. Ansökningar, meddelanden, hyresvärdarnas inloggningar och loggar ligger kvar tills du ber om att alla uppgifter raderas.";
+  return "Blixtbo-kontot är stängt och du är utloggad. Recensioner är borttagna. Ansökningar, meddelanden, hyresvärdarnas inloggningar och loggar ligger kvar tills du ber om att alla uppgifter raderas.";
 }
 
 export function LandingNotice() {

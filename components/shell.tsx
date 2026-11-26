@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Boot } from "@/components/boot";
+import { ReviewPrompt } from "@/components/review-prompt";
 import { IconBell, IconHome, IconList, IconUser } from "@/components/icons";
 import { Wordmark } from "@/components/mark";
 import { cx } from "@/components/ui";
@@ -67,16 +68,24 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </p>
             <p className="mt-1 text-xs leading-relaxed text-soft">{sourcesOn} hyresvärdar bevakas just nu.</p>
           </div>
-          <footer className="mt-4 px-3 pb-2">
+          <footer className="mt-4 flex gap-4 px-3 pb-2">
+            <Link href="/integritet" className="text-sm font-medium text-soft hover:text-ink">
+              Integritet
+            </Link>
             <Link href="/hjalp" className="text-sm font-medium text-soft hover:text-ink">
               Hjälp
             </Link>
           </footer>
         </div>
       </aside>
-      <div className="pb-28 md:pb-0">{children}</div>
+      <ReviewPrompt>
+        <div className="pb-28 md:pb-0">{children}</div>
+      </ReviewPrompt>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/92 backdrop-blur md:hidden">
-        <div className="mx-auto flex max-w-lg justify-center pt-2">
+        <div className="mx-auto flex max-w-lg justify-center gap-4 pt-2">
+          <Link href="/integritet" className="text-xs font-medium text-soft">
+            Integritet
+          </Link>
           <Link href="/hjalp" className="text-xs font-medium text-soft">
             Hjälp
           </Link>
