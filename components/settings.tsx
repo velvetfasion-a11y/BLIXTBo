@@ -151,6 +151,15 @@ export function Settings() {
             <span className="text-soft">→</span>
           </Link>
         </li>
+        <li>
+          <Link href="/guider" className="flex items-center justify-between gap-4 px-4 py-4">
+            <span>
+              <span className="block text-sm font-medium">Guider</span>
+              <span className="mt-0.5 block text-sm text-soft">Personbevis, köer, borgen och vad hyresvärdar kräver</span>
+            </span>
+            <span className="text-soft">→</span>
+          </Link>
+        </li>
       </ul>
 
       <section className="mt-10">
