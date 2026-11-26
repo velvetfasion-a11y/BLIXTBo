@@ -86,7 +86,7 @@ function PaymentForm({
 
 const BENEFITS = [
   "Håller dina köplatser aktiva och förnyar dem.",
-  "Skickar ansökan först, med profilen du redan fyllt i.",
+  "Skickar din ansökan med profilen du redan fyllt i, så att du kan bli först till kvarn.",
   "Bevakar hyresvärdarnas annonser och köer.",
 ] as const;
 

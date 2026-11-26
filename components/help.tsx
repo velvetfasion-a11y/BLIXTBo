@@ -70,7 +70,7 @@ export function Help() {
             <p>
               Samma profil används hos varje hyresvärd: yrke, inkomst, hushåll, brev och dokument. Under Koll ser du ansökningar, ködagar och när en kö behöver förnyas.
             </p>
-            <p>Premium håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna.</p>
+            <p>Premium håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna.</p>
           </div>
         </section>
 
