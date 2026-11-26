@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from blixtbo.billing import is_stripe_secret_key
 from blixtbo.config import settings
 from blixtbo.models import Approval, AuditLog, DeletionJournal, Job, LandlordLogin, Notice, User, utcnow
+from blixtbo.support_models import purge_support
 
 CONFIRMATION = "RADERA"
 RECENT_LOGIN_SECONDS = 5 * 60
@@ -347,7 +348,10 @@ def _delete_account(db: Session, journal: DeletionJournal, user: User | None, ui
     firestore.clear_account(uid)
     delete_sql_reviews(db, user_id=user.id if user is not None else "", firebase_uid=uid)
     if user is not None and user.auth_method != "deleted":
+        purge_support(db, user_id=user.id, firebase_uid=uid, emails={_personal_email(user.email)})
         _tombstone(user)
+    else:
+        purge_support(db, firebase_uid=uid)
     _finish(journal)
     _commit(db)
     return _result("account", stripe="unchanged", firebase_auth="unchanged", already=False)
@@ -401,6 +405,7 @@ def _erase(
         from blixtbo.reviews import delete_sql_reviews
 
         delete_sql_reviews(db, user_id=user.id if user is not None else "", firebase_uid=uid)
+        purge_support(db, user_id=user.id if user is not None else "", firebase_uid=uid, emails=emails)
         if user is not None:
             _delete_children(db, user, jobs="all")
             if emails:
@@ -412,6 +417,7 @@ def _erase(
         journal.phase = "local_done"
         _commit(db)
     else:
+        purge_support(db, firebase_uid=uid)
         stripe_state = "anonymised" if journal.stripe_customer_id else "none"
     try:
         firestore.purge_user(uid)

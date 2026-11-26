@@ -784,3 +784,8 @@ def reviews_admin(rating: str | None = None, owner: User = Depends(require_owner
         _review_error(exc)
     audit(db, owner.email, "admin.reviews", rating or "")
     return payload
+
+
+from blixtbo.support import register as register_support
+
+register_support(app, get_db, require_user)

@@ -35,6 +35,22 @@ class Settings(BaseSettings):
     public_app_url: str = "http://127.0.0.1:43123"
     # Optional. After a review of 4 or 5 the app links here. Empty hides the button.
     google_review_url: str = ""
+    # Support mail is optional. Empty SMTP_HOST stores the ticket and sends nothing.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_tls: bool = True
+    support_email: str = "support@blixtbo.se"
+    # Escalation mail. Empty uses support_email.
+    owner_alert_email: str = ""
+    # Optional assistant. Empty key: the app shows the ticket form and calls no model.
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-4o-mini"
+    support_ticket_limit: int = 5
+    support_chat_limit: int = 20
 
     def kek_bytes(self) -> bytes:
         if not self.worker_kek:

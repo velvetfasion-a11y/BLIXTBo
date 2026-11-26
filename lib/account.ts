@@ -36,7 +36,7 @@ export const DELETE_SCOPES: DeleteChoice[] = [
     id: "account",
     title: "Radera bara Blixtbo-kontot",
     summary: "Kontot stängs och går inte att logga in på. Sådant som inte är själva kontot lämnas kvar.",
-    removes: ["Namn, e-post och kopplingen till inloggningen i Blixtbo", "Möjligheten att öppna det här kontot", "Recensioner du lämnat i Blixtbo"],
+    removes: ["Namn, e-post och kopplingen till inloggningen i Blixtbo", "Recensioner du lämnat i Blixtbo", "Supportärenden och chattar med support", "Möjligheten att öppna det här kontot"],
     keeps: [
       "Profil, ansökningar, sparade sökningar och filter",
       "Meddelanden och notiser",
@@ -55,6 +55,7 @@ export const DELETE_SCOPES: DeleteChoice[] = [
       "Recensioner du lämnat i Blixtbo",
       "Sparade sökningar och filter",
       "Meddelanden och notiser",
+      "Supportärenden och chattar med support",
       "Sparade inloggningar hos hyresvärdar",
       "Loggar som pekar på dig",
       "Prenumerationen avslutas",
