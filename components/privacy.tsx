@@ -57,6 +57,18 @@ export function Privacy() {
         </p>
       </LegalSection>
 
+      <LegalSection title="Recensioner">
+        <p>
+          När du har fått en lägenhet kan du lämna ett betyg från 1 till 5 och en valfri text, högst ungefär 1 000 tecken. Vi sparar ditt användar-id, betyget, texten, hyresvärden om den hör till ansökan, tidpunkten och om du samtyckt till att recensionen visas.
+        </p>
+        <p>
+          Samtycket är frivilligt. Kryssar du i att vi får visa recensionen används bara förnamn. Utan den rutan visas recensionen inte för andra. Du kan ändra recensionen efteråt. Det finns en recension per lägenhet du har fått.
+        </p>
+        <p>
+          Recensioner raderas när Blixtbo-kontot raderas, och när du ber om att alla uppgifter om dig raderas. Att bara koppla bort Google, Apple eller en hyresvärd lämnar recensionen kvar, eftersom kontot finns kvar.
+        </p>
+      </LegalSection>
+
       <LegalSection title="Kontakt">
         <p>
           Frågor om personuppgifter skickar du till{" "}

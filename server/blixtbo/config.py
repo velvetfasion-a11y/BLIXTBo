@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     trial_days: int = 3
     free_auto_apply_limit: int = 2
     public_app_url: str = "http://127.0.0.1:43123"
+    # Optional. After a review of 4 or 5 the app links here. Empty hides the button.
+    google_review_url: str = ""
 
     def kek_bytes(self) -> bytes:
         if not self.worker_kek:

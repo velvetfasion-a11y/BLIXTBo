@@ -29,6 +29,9 @@ export function Help() {
           <Link href="/installningar" className="text-pine">
             Till inställningar
           </Link>
+          <Link href="/integritet" className="text-pine">
+            Integritet
+          </Link>
         </div>
 
         <section className="mt-10" aria-labelledby="guider">
@@ -89,10 +92,10 @@ export function Help() {
           <div className="mt-4 space-y-4 text-sm leading-relaxed text-soft">
             <p>Under Inställningar, när du är inloggad, finns tre val. Du skriver RADERA innan något händer. Om inloggningen är för gammal ber vi dig logga in igen i ett fönster.</p>
             <p>
-              <span className="font-medium text-ink">Radera bara Blixtbo-kontot.</span> Namn, e-post och kopplingen till inloggningen tas bort, så kontot går inte att öppna. Ansökningar, sparade sökningar och filter, meddelanden, hyresvärdarnas inloggningar, loggar och betaluppgifter lämnas kvar. Firebase-kontot finns kvar.
+              <span className="font-medium text-ink">Radera bara Blixtbo-kontot.</span> Namn, e-post och kopplingen till inloggningen tas bort, så kontot går inte att öppna. Recensioner tas bort. Ansökningar, sparade sökningar och filter, meddelanden, hyresvärdarnas inloggningar, loggar och betaluppgifter lämnas kvar. Firebase-kontot finns kvar.
             </p>
             <p>
-              <span className="font-medium text-ink">Radera alla uppgifter om mig.</span> Det är radering enligt dataskyddsförordningen (GDPR). Profil, ansökningar, sparade sökningar och filter, meddelanden och notiser, sparade inloggningar hos hyresvärdar och loggar som pekar på dig tas bort. Prenumerationen avslutas. Stripe-kunden anonymiseras, och Firebase-kontot tas bort.
+              <span className="font-medium text-ink">Radera alla uppgifter om mig.</span> Det är radering enligt dataskyddsförordningen (GDPR). Profil, ansökningar, recensioner, sparade sökningar och filter, meddelanden och notiser, sparade inloggningar hos hyresvärdar och loggar som pekar på dig tas bort. Prenumerationen avslutas. Stripe-kunden anonymiseras, och Firebase-kontot tas bort.
             </p>
             <p>
               Fakturor och andra betalunderlag behålls, eftersom bokföringslagen kräver det. De kopplas inte längre till ditt namn eller din e-post.

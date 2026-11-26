@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Boot } from "@/components/boot";
+import { ReviewApplicationAction } from "@/components/review-prompt";
 import { LandlordIdentity, LandlordLogo } from "@/components/landlord-logo";
 import { Countdown } from "@/components/countdown";
 import { EmptyState, Segmented, StatusPill, Switch, cx } from "@/components/ui";
@@ -140,6 +141,9 @@ function TrackerInner() {
                     </p>
                     <OfferTrail status={application.status} />
                   </button>
+                  <div className="empty:hidden mt-3">
+                    <ReviewApplicationAction applicationId={application.id} status={application.status} />
+                  </div>
                   {expanded ? (
                     <div className="mt-4 border-t border-line pt-4">
                       <p className="text-sm leading-relaxed text-soft">{application.note}</p>

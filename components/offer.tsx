@@ -7,6 +7,7 @@ import { Boot } from "@/components/boot";
 import { Countdown } from "@/components/countdown";
 import { IconChevron } from "@/components/icons";
 import { LandlordIdentity } from "@/components/landlord-logo";
+import { ReviewApplicationAction } from "@/components/review-prompt";
 import { Button, Sheet } from "@/components/ui";
 import { asset } from "@/lib/asset";
 import { floorLabel, formatDate, formatDateTime, kr, rok } from "@/lib/format";
@@ -91,6 +92,9 @@ function OfferInner() {
             </ul>
           </section>
           <p className="text-sm leading-relaxed text-soft">{listing.description}</p>
+          {declined ? null : (
+            <ReviewApplicationAction applicationId={application.id} status={application.status} />
+          )}
         </div>
       </article>
       {open || accepted ? (

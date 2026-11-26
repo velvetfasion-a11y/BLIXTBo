@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -91,6 +91,25 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(80))
     target: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Review(Base):
+    """One review per user and obtained apartment. Editable in place."""
+
+    __tablename__ = "reviews"
+    __table_args__ = (UniqueConstraint("user_id", "application_id", name="uq_review_user_application"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    firebase_uid: Mapped[str] = mapped_column(String(128), default="", index=True)
+    application_id: Mapped[str] = mapped_column(String(80))
+    listing_id: Mapped[str] = mapped_column(String(80), default="")
+    rating: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text, default="")
+    landlord: Mapped[str] = mapped_column(String(200), default="")
+    publish_consent: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class DeletionJournal(Base):

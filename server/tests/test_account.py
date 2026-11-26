@@ -153,6 +153,9 @@ class Gateway:
         if self.fail_firestore:
             raise RuntimeError("firestore down")
 
+    def delete_reviews(self, uid):
+        self.log.append(("reviews", uid))
+
 
 def _db():
     return Session()
