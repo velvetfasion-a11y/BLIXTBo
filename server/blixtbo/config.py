@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_price_id: str = ""
     premium_price_kr: float = 99
-    trial_days: int = 3
-    free_auto_apply_limit: int = 2
+    trial_days: int = 0
+    free_auto_apply_limit: int = 5
     public_app_url: str = "http://127.0.0.1:43123"
     # Optional. After a review of 4 or 5 the app links here. Empty hides the button.
     google_review_url: str = ""

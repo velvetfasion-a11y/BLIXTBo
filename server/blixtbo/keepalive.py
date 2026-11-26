@@ -332,7 +332,7 @@ def read_entitlement(uid: str) -> dict | None:
 
 
 def entitled(user: User) -> bool:
-    """True only for premium with status active. Trial is stored as active. Errors raise."""
+    """True only for paid Premium that is active. A trial flag does not count. Errors raise."""
     if settings.data_backend != "firestore":
         return os.environ.get("KEEPALIVE_ASSUME_PAID") == "1"
     uid = getattr(user, "firebase_uid", None) or ""
@@ -346,7 +346,13 @@ def entitled(user: User) -> bool:
         data = read_entitlement(uid)
     except Exception as exc:
         raise EntitlementUnavailable() from exc
-    ok = bool(data) and data.get("plan") == "premium" and data.get("status") == "active"
+    ok = (
+        bool(data)
+        and data.get("plan") == "premium"
+        and data.get("status") == "active"
+        and not data.get("trial")
+        and data.get("autoApply") is not False
+    )
     _cache[uid] = (now + 600, ok)
     return ok
 

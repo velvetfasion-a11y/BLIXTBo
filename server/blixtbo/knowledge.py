@@ -36,8 +36,6 @@ SOURCE_FILES = (
 _TEXT_NODE = re.compile(r">([^<>{}]{8,4000})<")
 _EXPR = re.compile(r"\$\{[^{}]*\}")
 _PRICE = re.compile(r"DEFAULT_PREMIUM_KR\s*=\s*(\d+)")
-_DAYS = re.compile(r"DEFAULT_TRIAL_DAYS\s*=\s*(\d+)")
-_FREE = re.compile(r"DEFAULT_FREE_AUTO_APPLIES\s*=\s*(\d+)")
 
 _cache: dict[str, str] = {"key": "", "text": ""}
 
@@ -87,14 +85,9 @@ def _useful(text: str) -> bool:
 
 def _price_lines(source: str) -> list[str]:
     price = _PRICE.search(source)
-    days = _DAYS.search(source)
-    free = _FREE.search(source)
-    lines: list[str] = []
-    if price and days:
-        lines.append(f"Premium kostar {price.group(1)} kr per månad efter {days.group(1)} dagars provperiod.")
-    if free:
-        lines.append(f"Gratisversionen har ett tak på {free.group(1)} automatiska ansökningar. Premium tar bort taket.")
-    return lines
+    if not price:
+        return []
+    return [f"Premium kostar {price.group(1)} kr per månad."]
 
 
 def _quoted(source: str) -> list[str]:

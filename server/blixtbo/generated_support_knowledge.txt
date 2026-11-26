@@ -8,7 +8,7 @@ En ansökan skickas bara när användaren själv sveper ja eller bekräftar i ap
 
 Köplatser kan hållas aktiva under Profil, med valet Håll mina köplatser aktiva automatiskt. Då loggar Blixtbo in hos hyresvärden och bekräftar kön. En missad förnyelse kan nollställa kötid. BankID sparas aldrig. Hyresvärdens lösenord sparas krypterat.
 
-Gratisversionen har ett tak för automatiska ansökningar. Premium tar bort taket. Pris och provperiod läses från källkoden när kunskapsbasen byggs. Standard är 99 kr per månad efter 3 dagars prov.
+Premium kostar 99 kr per månad. Det håller köplatser aktiva och förnyar dem, skickar ansökan först och bevakar hyresvärdarnas annonser och köer. Blixtbo äger inga lägenheter.
 
 Uppsägning, paus och ånger görs under Inställningar och sedan Prenumeration, eller genom att skriva till support. Assistenten lovar aldrig en återbetalning. En människa avgör betalningsärenden.
 
@@ -19,10 +19,9 @@ Support svarar inom 24 timmar. Adressen är support@blixtbo.se. Osäkerhet, bugg
 ## lib/billing.ts
 Premium är pausat. Automatiska ansökningar är av.
 Prenumerationen är avslutad.
-Premium. Ansökningar går utan tak.
-Gratis. Ett par automatiska ansökningar ingår.
-Premium kostar 99 kr per månad efter 3 dagars provperiod.
-Gratisversionen har ett tak på 2 automatiska ansökningar. Premium tar bort taket.
+Premium är igång. kr i månaden.
+Ingen Premium just nu.
+Premium kostar 99 kr per månad.
 
 ## lib/account.ts
 Radera bara Blixtbo-kontot
@@ -72,15 +71,14 @@ Recensioner raderas när Blixtbo-kontot raderas, och när du ber om att alla upp
 
 ## components/terms.tsx
 Köpvillkor för Blixtbo Premium
-Det här gäller när du startar provperioden eller betalar för Blixtbo Premium.
-Pris och provperiod
+Det här gäller när du betalar för Blixtbo Premium.
 Blixtbo är en sök- och aviseringstjänst. Vi bevakar hyresvärdarnas annonser och köer och kan skicka din ansökan med profilen du fyllt i. Blixtbo äger inga lägenheter, hyr inte ut bostäder och förmedlar inte hyreskontrakt. Vi kan inte garantera att du får en lägenhet. Hyresvärden bestämmer vem som får kontraktet, och du skriver avtalet med hyresvärden.
-Provperioden är inte en separat produkt och inte en rabattkod. Kortet sparas när du startar, så att dragningen kan ske när provperioden tar slut.
-Du kan säga upp när som helst under Inställningar och sedan Prenumeration. Uppsägningen gäller till periodens slut. Du behåller Premium tills den påbörjade perioden, inklusive en pågående provperiod, tar slut. Därefter blir kontot gratis och inga fler dragningar görs. Du kan ångra ett planerat avslut på samma sida innan perioden tar slut.
-Du har 14 dagars ångerrätt enligt lagen (2005:59) om distansavtal och avtal utanför affärslokaler. Fristen räknas från den dag avtalet ingås, alltså när du startar provperioden.
-Genom att starta provperioden begär du att den digitala tjänsten börjar levereras omedelbart, under ångerfristen, och du bekräftar att du känner till hur det påverkar ångerrätten. För en löpande digital tjänst innebär det att du kan få betala en proportionell del för den tid du hunnit använda tjänsten om du ångrar dig efter att leveransen har börjat. Ångerrätten upphör när tjänsten är fullgjord i sin helhet, om du i förväg uttryckligen har samtyckt till att den påbörjas och bekräftat att du därmed förlorar ångerrätten när avtalet är fullgjort.
-Premium är en löpande tjänst och är inte fullgjord bara för att provperioden har startat. Säger du upp inom 14 dagar, innan någon månadsavgift har dragits, avslutas prenumerationen och ingen avgift tas ut. Har en avgift redan dragits och ångerrätten fortfarande gäller återbetalar vi beloppet.
-Ingen månadsavgift tas ut om du säger upp innan provperioden tar slut. Efter en genomförd dragning gäller en vanlig uppsägning till periodens slut, och den redan betalda perioden betalas inte tillbaka. Undantaget är när ångerrätten ger rätt till återbetalning, eller när vi har dragit fel belopp.
+Kortet sparas när du startar, så att den månatliga dragningen kan ske. Det är inte en rabattkod.
+Du kan säga upp när som helst under Inställningar och sedan Prenumeration. Uppsägningen gäller till periodens slut. Du behåller Premium tills den påbörjade perioden tar slut. Därefter görs inga fler dragningar. Du kan ångra ett planerat avslut på samma sida innan perioden tar slut.
+Du har 14 dagars ångerrätt enligt lagen (2005:59) om distansavtal och avtal utanför affärslokaler. Fristen räknas från den dag avtalet ingås, alltså när du startar Premium.
+Genom att starta Premium begär du att den digitala tjänsten börjar levereras omedelbart, under ångerfristen, och du bekräftar att du känner till hur det påverkar ångerrätten. För en löpande digital tjänst innebär det att du kan få betala en proportionell del för den tid du hunnit använda tjänsten om du ångrar dig efter att leveransen har börjat. Ångerrätten upphör när tjänsten är fullgjord i sin helhet, om du i förväg uttryckligen har samtyckt till att den påbörjas och bekräftat att du därmed förlorar ångerrätten när avtalet är fullgjort.
+Premium är en löpande tjänst. Säger du upp inom 14 dagar och ångerrätten fortfarande gäller återbetalar vi den dragna månadsavgiften.
+Efter en genomförd dragning gäller en vanlig uppsägning till periodens slut, och den redan betalda perioden betalas inte tillbaka. Undantaget är när ångerrätten ger rätt till återbetalning, eller när vi har dragit fel belopp.
 En återbetalning går tillbaka till samma betalmedel via Stripe. Att en ansökan inte leder till en lägenhet är inte skäl för återbetalning. Blixtbo kan inte garantera en bostad.
 Fakturor och andra betalunderlag behålls enligt bokföringslagen. De kopplas bort från ditt namn och din e-post om du ber oss radera uppgifterna om dig.
 
@@ -92,7 +90,7 @@ Steg för steg om personbevis, köer, borgen och vad hyresvärdar brukar kräva.
 Hur Blixtbo fungerar
 Blixtbo bevakar hyresvärdarnas annonser och lägger nya bostäder överst. Du anger område, hyra, storlek och inflytt en gång. Ett ja kan skicka ansökan med profilen du redan fyllt i.
 Samma profil används hos varje hyresvärd: yrke, inkomst, hushåll, brev och dokument. Under Koll ser du ansökningar, ködagar och när en kö behöver förnyas.
-Gratisversionen har ett tak för automatiska ansökningar. Premium tar bort det taket.
+Premium håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna.
 Betalning och avslut
 Avsluta prenumerationen via Inställningar och sedan Prenumeration. Du behåller Premium tills den betalda perioden tar slut. Därefter blir kontot gratis, och inga fler dragningar görs. Du kan ångra ett planerat avslut innan perioden tar slut, på samma sida.
 En paus stänger av automatiska ansökningar utan att avsluta kontot. Den finns också under Prenumeration.
@@ -159,7 +157,7 @@ Välj område, hyra och storlek.
 Fyll i din profil en gång.
 Svep på en ledig lägenhet för att skicka ansökan.
 Följ ansökningar och köer under Koll.
-Gratis: bevakning och ansökningar upp till ett tak. Premium: inga tak på automatiska ansökningar, kr/månad efter dagars prov. Avsluta när du vill under Inställningar.
+Premium håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna. kr/månad. Avsluta när du vill under Inställningar.
 Var hittar jag lediga lägenheter i Stockholm?
 Hyresvärdarna annonserar på sina egna sidor, hos Bostadsförmedlingen och på andra portaler. Blixtbo bevakar annonserna åt dig och visar nya lägenheter som matchar dina val, så du slipper kolla flera ställen själv.
 Hur får jag ett förstahandskontrakt i Stockholm?
@@ -175,13 +173,12 @@ Nej. Blixtbo äger inga lägenheter och förmedlar inte kontrakt. Vi bevakar hyr
 Kan jag hyra lägenhet utan inkomst?
 Det är svårt. De flesta hyresvärdar kräver inkomst eller borgensman. Några har andra villkor, så läs kraven i annonsen innan du ansöker. Blixtbo lovar inte att du blir godkänd.
 Vad kostar Blixtbo?
-Att bevaka och ansöka är gratis upp till ett tak. Premium kostar kr/månad efter dagars prov och tar bort taket. Du avslutar under Inställningar, Prenumeration.
+Premium kostar kr/månad. Det håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna. Du avslutar under Inställningar, Prenumeration.
 Vilka områden kan jag söka i?
 Innerstan, Gärdet och Hjorthagen, Hammarby Sjöstad, Liljeholmen, Solna och Sundbyberg. Fler områden kommer.
 Vad är skillnaden mellan första och andra hand?
 Förstahandskontrakt är ditt eget kontrakt med hyresvärden. Andrahand är när någon som själv hyr lånar ut sin lägenhet, oftast tidsbegränsat. Blixtbo fokuserar på förstahandskontrakt.
-Bevakning och ansökningar upp till ett tak.
-kr per månad efter dagars provperiod.
+Bevakning av hyresvärdarnas annonser.
 
 ## components/connections.tsx
 Behöver nytt lösenord
@@ -204,9 +201,8 @@ Hantera prenumeration
 Premium avslutas . Du har tillgång tills perioden tar slut, och inga fler dragningar görs.
 Premium är pausat. Automatiska ansökningar är av, och inga nya dragningar görs förrän du återupptar.
 Prenumerationen är avslutad. Inga fler dragningar görs.
-Premium, provperiod. Därefter kr i månaden.
 Premium är igång. kr i månaden.
-Gratis. Ett par automatiska ansökningar ingår.
+Ingen Premium just nu.
 Prenumeration · Blixtbo
 Prenumerationen kunde inte hämtas.
 Det gick inte att uppdatera prenumerationen.
@@ -222,14 +218,16 @@ Avsluta prenumerationen?
 Betalningen gick inte att starta.
 Familjen Grotesk, Avenir Next, sans-serif
 Kortet gick inte att bekräfta.
-Starta 3 dagar gratis
+Håller dina köplatser aktiva och förnyar dem.
+Skickar ansökan först, med profilen du redan fyllt i.
+Bevakar hyresvärdarnas annonser och köer.
 Kortfältet kräver en pk_test_- eller pk_live_-nyckel.
 Logga in med Google så att betalningen stannar i appen.
 Stripe gav ingen client_secret.
 Gick inte att pausa.
 Gick inte att återuppta.
-Betala här i appen
-Svep gratis. Premium skickar ansökan åt dig. Kort, Apple Pay och Google Pay visas när enheten har dem.
+Missa inte nästa lägenhet
+De bästa lägenheterna försvinner på minuter. Blixtbo ansöker först och håller köerna vid liv.
 
 ## components/confirm-apply.tsx
 Bekräfta och skicka
@@ -238,7 +236,7 @@ Bekräfta och skicka
 Så fungerar Blixtbo, betalning, avslut och radering av uppgifter.
 
 ## app/villkor/page.tsx
-Köpvillkor för Blixtbo Premium: pris, provperiod, uppsägning, ångerrätt och återbetalning.
+Köpvillkor för Blixtbo Premium: pris, uppsägning, ångerrätt och återbetalning.
 
 ## app/integritet/page.tsx
 Integritetspolicy för Blixtbo: vilka uppgifter vi sparar, varför, hur länge, och hur du raderar dem.

@@ -154,11 +154,11 @@ def test_free_canceled_paused_and_errors_never_queue(monkeypatch, caplog):
     monkeypatch.setattr(settings, "data_backend", "firestore")
     queued = keepalive.queue_due_keepalives(db)
     db.commit()
-    assert queued == 2
+    assert queued == 1
     sources = {job.user_id for job in db.query(Job).filter_by(kind="keepalive").all()}
-    paid_ids = {user.id for user in db.query(User).filter(User.firebase_uid.in_(("premium", "trial"))).all()}
+    paid_ids = {user.id for user in db.query(User).filter(User.firebase_uid.in_(("premium",))).all()}
     assert sources == paid_ids
-    for uid in ("free", "canceled", "paused", "missing"):
+    for uid in ("free", "canceled", "paused", "missing", "trial"):
         person = db.query(User).filter_by(firebase_uid=uid).one()
         row = db.query(LandlordLogin).filter_by(user_id=person.id).one()
         assert row.keepalive_state == "paused"
@@ -204,7 +204,7 @@ def test_cancel_pauses_and_tells_the_deadlines_once(monkeypatch):
     keepalive.clear_entitlement_cache()
     keepalive.queue_due_keepalives(db)
     db.commit()
-    assert db.query(Job).filter_by(user_id=user.id, kind="keepalive").count() == 2
+    assert db.query(Job).filter_by(user_id=user.id, kind="keepalive").count() == 0
 
 
 def test_jitter_stays_in_daytime_stockholm():

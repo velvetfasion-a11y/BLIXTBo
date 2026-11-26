@@ -1,4 +1,4 @@
-import { premiumPriceKr, trialDays } from "@/lib/billing";
+import { premiumPriceKr } from "@/lib/billing";
 
 export const SITE_URL = "https://blixtbo.se";
 
@@ -36,15 +36,13 @@ export const HOME_STEPS = [
 
 export function includedCopy() {
   const price = premiumPriceKr();
-  const days = trialDays();
-  return `Gratis: bevakning och ansökningar upp till ett tak. Premium: inga tak på automatiska ansökningar, ${price} kr/månad efter ${days} dagars prov. Avsluta när du vill under Inställningar.`;
+  return `Premium håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna. ${price} kr/månad. Avsluta när du vill under Inställningar.`;
 }
 
 export type FaqItem = { question: string; answer: string };
 
 export function homeFaqs(): FaqItem[] {
   const price = premiumPriceKr();
-  const days = trialDays();
   return [
     {
       question: "Var hittar jag lediga lägenheter i Stockholm?",
@@ -83,7 +81,7 @@ export function homeFaqs(): FaqItem[] {
     },
     {
       question: "Vad kostar Blixtbo?",
-      answer: `Att bevaka och ansöka är gratis upp till ett tak. Premium kostar ${price} kr/månad efter ${days} dagars prov och tar bort taket. Du avslutar under Inställningar, Prenumeration.`,
+      answer: `Premium kostar ${price} kr/månad. Det håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna. Du avslutar under Inställningar, Prenumeration.`,
     },
     {
       question: "Vilka områden kan jag söka i?",
@@ -141,7 +139,6 @@ export function organizationJsonLd() {
 
 export function webApplicationJsonLd() {
   const price = premiumPriceKr();
-  const days = trialDays();
   return {
     "@context": "https://schema.org",
     "@type": "WebApplication",
@@ -157,7 +154,7 @@ export function webApplicationJsonLd() {
         name: "Gratis",
         price: "0",
         priceCurrency: "SEK",
-        description: "Bevakning och ansökningar upp till ett tak.",
+        description: "Bevakning av hyresvärdarnas annonser.",
         url: SITE_URL,
       },
       {
@@ -165,7 +162,7 @@ export function webApplicationJsonLd() {
         name: "Premium",
         price: String(price),
         priceCurrency: "SEK",
-        description: `${price} kr per månad efter ${days} dagars provperiod.`,
+        description: `${price} kr per månad.`,
         url: SITE_URL,
         priceSpecification: {
           "@type": "UnitPriceSpecification",

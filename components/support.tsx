@@ -250,7 +250,7 @@ function SupportForm({ email, demo }: { email: string; demo: boolean }) {
         <p className="mt-2 text-sm leading-relaxed text-soft">{SUPPORT_PROMISE}</p>
         <div className="mt-4 space-y-4">
           <Field label="E-post för svar" type="email" autoComplete="email" value={replyTo} onChange={(event) => setReplyTo(event.target.value)} />
-          <Field label="Ämne" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Fråga om provperioden" />
+          <Field label="Ämne" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Fråga om Premium" />
           <TextArea label="Meddelande" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Skriv vad du behöver hjälp med" />
           {error ? (
             <p className="text-sm text-danger" role="alert">
