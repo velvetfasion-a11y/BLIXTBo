@@ -182,6 +182,58 @@ def _after_token(client: httpx.Client, token: str, guard: SiteGuard | None) -> S
     return finished("HomeQ är kopplat", "E-post och identitet är bekräftade hos HomeQ.", "logged_in")
 
 
+def keepalive(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+    """Login and token check only. No applications list and no apply."""
+    try:
+        response = request(
+            client,
+            "POST",
+            API + LOGIN,
+            guard,
+            json={"email": secret.get("username"), "password": secret.get("password")},
+            headers=_headers(),
+        )
+    except RobotsBlocked:
+        return paused("captcha", "HomeQ vill att du tar över", "Robots.txt spärrar inloggningen. Inget skickades.")
+    except httpx.TransportError:
+        return paused("unreachable", "Vi når inte HomeQ just nu", "Vi försöker igen senare.")
+    if response.status_code >= 500:
+        return paused("unreachable", "Vi når inte HomeQ just nu", "Vi försöker igen senare.")
+    if response.status_code == 429:
+        return paused("rate_limited", "HomeQ vill att du tar över", "HomeQ ber oss vänta. Vi försöker inte igen nu.")
+    if captcha(response.status_code, response.text):
+        return paused("captcha", "HomeQ vill att du tar över", "HomeQ visar en kontroll eller captcha. Vi försöker inte igen.")
+    data = _json(response)
+    token = _token_from(data)
+    if response.status_code >= 400 or not token:
+        kind = classify_login(response)
+        if kind == "captcha":
+            return paused("captcha", "HomeQ vill att du tar över", "HomeQ visar en kontroll eller captcha. Vi försöker inte igen.")
+        if kind == "password_changed" or response.status_code in (400, 401):
+            return paused("password_changed", "Lösenordet hos HomeQ stämmer inte", "Kontrollera e-post och lösenord och spara dem igen.")
+        if kind == "session_expired":
+            return paused("session_expired", "Inloggningen hos HomeQ har gått ut", "Logga in en gång till hos HomeQ.")
+        return paused("site_changed", "HomeQ har ändrat inloggningen", "HomeQ tog inte emot inloggningen. Försöket är pausat.")
+    try:
+        checked = request(client, "GET", API + VERIFY, guard, headers=_headers(token))
+    except RobotsBlocked:
+        return paused("captcha", "HomeQ vill att du tar över", "Robots.txt spärrar kontrollen. Inget mer skickades.")
+    except httpx.TransportError:
+        return paused("unreachable", "Vi når inte HomeQ just nu", "Vi försöker igen senare.")
+    if checked.status_code >= 500:
+        return paused("unreachable", "Vi når inte HomeQ just nu", "Vi försöker igen senare.")
+    if checked.status_code == 429:
+        return paused("rate_limited", "HomeQ vill att du tar över", "HomeQ ber oss vänta. Vi försöker inte igen nu.")
+    if captcha(checked.status_code, checked.text):
+        return paused("captcha", "HomeQ vill att du tar över", "HomeQ visar en kontroll eller captcha. Vi försöker inte igen.")
+    if checked.status_code in (401, 403):
+        return paused("session_expired", "Inloggningen hos HomeQ har gått ut", "Logga in en gång till hos HomeQ.")
+    waiting = _verification(*_flags(_json(checked)))
+    if waiting:
+        return waiting
+    return finished("HomeQ är kollat", "Inloggningen hos HomeQ fungerar.", "queue_ok")
+
+
 def create(client: httpx.Client, username: str, password: str, guard: SiteGuard | None = None) -> StepResult:
     body = {"email": username, "password": password, "accepted_terms": True}
     try:

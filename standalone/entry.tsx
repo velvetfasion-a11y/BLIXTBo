@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { AdminCompose, AdminHome, AdminListings, AdminShell, AdminSources, AdminUsers } from "@/components/admin";
+import { AdminCases } from "@/components/support-admin";
 import { Account } from "@/components/account";
 import { BankId } from "@/components/bankid";
 import { Connections } from "@/components/connections";
@@ -30,6 +31,7 @@ function App() {
     else if (path.startsWith("/admin/kallor")) page = <AdminSources />;
     else if (path.startsWith("/admin/anvandare")) page = <AdminUsers />;
     else if (path.startsWith("/admin/utskick")) page = <AdminCompose />;
+    else if (path.startsWith("/admin/arenden")) page = <AdminCases />;
     return <AdminShell>{page}</AdminShell>;
   }
 

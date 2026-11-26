@@ -18,11 +18,15 @@ PASS_FIELD = "ctl00$ctl01$DefaultSiteContentPlaceHolder1$Col1$LoginControl1$txtP
 SUBMIT_FIELD = "ctl00$ctl01$DefaultSiteContentPlaceHolder1$Col1$LoginControl1$btnLogin"
 
 
-def _post_login(client: httpx.Client, secret: dict, guard: SiteGuard | None) -> StepResult:
+def _post_login(client: httpx.Client, secret: dict, guard: SiteGuard | None, *, keepalive: bool = False) -> StepResult:
     try:
         page = request(client, "GET", LOGIN, guard, follow_redirects=False)
     except RobotsBlocked:
         return paused("captcha", "Rikshem tillåter inte anropet", "Robots.txt spärrar inloggningen. Inget skickades.")
+    if keepalive and page.status_code >= 500:
+        return paused("unreachable", "Vi når inte Rikshem just nu", "Vi försöker igen senare.")
+    if keepalive and page.status_code == 429:
+        return paused("rate_limited", "Rikshem vill att du tar över", "Rikshem ber oss vänta. Vi försöker inte igen nu.")
     if captcha(page.status_code, page.text):
         return paused("captcha", "Rikshem vill att du tar över", "Rikshem visar en kontroll. Vi försöker inte igen.")
     if USER_FIELD not in page.text or PASS_FIELD not in page.text:
@@ -47,6 +51,10 @@ def _post_login(client: httpx.Client, secret: dict, guard: SiteGuard | None) -> 
         )
     except RobotsBlocked:
         return paused("captcha", "Rikshem tillåter inte anropet", "Inget skickades.")
+    if keepalive and sent.status_code >= 500:
+        return paused("unreachable", "Vi når inte Rikshem just nu", "Vi försöker igen senare.")
+    if keepalive and sent.status_code == 429:
+        return paused("rate_limited", "Rikshem vill att du tar över", "Rikshem ber oss vänta. Vi försöker inte igen nu.")
     if captcha(sent.status_code, sent.text):
         return paused("captcha", "Rikshem vill att du tar över", "Vi försöker inte igen.")
     kind = classify_html(sent.status_code, sent.text)
@@ -113,6 +121,33 @@ def apply(client: httpx.Client, secret: dict, payload: dict, guard: SiteGuard | 
     if sent.status_code >= 400:
         return paused("site_changed", "Rikshem tog inte emot anmälan", "Försöket är pausat.")
     return finished("Intresseanmälan skickad till Rikshem", "Ansökan är skickad hos Rikshem.", "applied")
+
+
+def keepalive(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+    """Login, then GET /mina-sidor/. A renewal reminder becomes a notice, never an action."""
+    signed = _post_login(client, secret, guard, keepalive=True)
+    if not signed.ok:
+        return signed
+    try:
+        page = request(client, "GET", ORIGIN + "/mina-sidor/", guard, follow_redirects=False)
+    except RobotsBlocked:
+        return paused("captcha", "Rikshem vill att du tar över", "Robots.txt spärrar sidan. Inget mer skickades.")
+    except httpx.TransportError:
+        return paused("unreachable", "Vi når inte Rikshem just nu", "Vi försöker igen senare.")
+    if page.status_code >= 500:
+        return paused("unreachable", "Vi når inte Rikshem just nu", "Vi försöker igen senare.")
+    if page.status_code == 429:
+        return paused("rate_limited", "Rikshem vill att du tar över", "Rikshem ber oss vänta. Vi försöker inte igen nu.")
+    if captcha(page.status_code, page.text):
+        return paused("captcha", "Rikshem vill att du tar över", "Rikshem visar en kontroll. Vi försöker inte igen.")
+    lowered = page.text.lower()
+    if "36 månader" in lowered or ("förnya" in lowered and "kö" in lowered):
+        return finished(
+            "Kön hos Rikshem behöver en titt",
+            "Rikshem visar en påminnelse om kön. Logga in själv om du vill förnya. Blixtbo gör inte det åt dig.",
+            "queue_action",
+        )
+    return finished("Rikshem är kollat", "Inloggningen hos Rikshem fungerar.", "queue_ok")
 
 
 def renew(client: httpx.Client, secret: dict, payload: dict, guard: SiteGuard | None = None) -> StepResult:

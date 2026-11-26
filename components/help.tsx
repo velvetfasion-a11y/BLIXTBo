@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { FaqList } from "@/components/faq-list";
 import { SiteFooter } from "@/components/site-footer";
+import { SupportDesk } from "@/components/support";
 import { Wordmark } from "@/components/mark";
 import { premiumPriceKr, trialDays } from "@/lib/billing";
 import { SUPPORT_EMAIL } from "@/lib/company";
+import { guideHref, guides } from "@/lib/guides";
 
 export function Help() {
   const days = trialDays();
@@ -22,10 +24,34 @@ export function Help() {
           <Link href="/" className="text-pine">
             Till start
           </Link>
+          <Link href="/guider" className="text-pine">
+            Guider
+          </Link>
           <Link href="/installningar" className="text-pine">
             Till inställningar
           </Link>
+          <Link href="/integritet" className="text-pine">
+            Integritet
+          </Link>
         </div>
+
+        <section className="mt-10" aria-labelledby="guider">
+          <h2 id="guider" className="font-serif text-2xl tracking-[-0.03em]">
+            Guider om att hyra
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-soft">
+            Steg för steg om personbevis, köer, borgen och vad hyresvärdar brukar kräva. Guiderna är allmän information, inte juridisk rådgivning, och Blixtbo garanterar inget kontrakt.
+          </p>
+          <ul className="mt-4 space-y-3 text-sm">
+            {guides.map((guide) => (
+              <li key={guide.slug}>
+                <Link href={guideHref(guide.slug)} className="font-medium text-pine">
+                  {guide.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <section className="mt-10" aria-labelledby="vanliga-fragor">
           <h2 id="vanliga-fragor" className="font-serif text-2xl tracking-[-0.03em]">
@@ -67,10 +93,10 @@ export function Help() {
           <div className="mt-4 space-y-4 text-sm leading-relaxed text-soft">
             <p>Under Inställningar, när du är inloggad, finns tre val. Du skriver RADERA innan något händer. Om inloggningen är för gammal ber vi dig logga in igen i ett fönster.</p>
             <p>
-              <span className="font-medium text-ink">Radera bara Blixtbo-kontot.</span> Namn, e-post och kopplingen till inloggningen tas bort, så kontot går inte att öppna. Ansökningar, sparade sökningar och filter, meddelanden, hyresvärdarnas inloggningar, loggar och betaluppgifter lämnas kvar. Firebase-kontot finns kvar.
+              <span className="font-medium text-ink">Radera bara Blixtbo-kontot.</span> Namn, e-post och kopplingen till inloggningen tas bort, så kontot går inte att öppna. Recensioner, supportärenden och chattar med support tas också bort. Ansökningar, sparade sökningar och filter, meddelanden, hyresvärdarnas inloggningar, loggar och betaluppgifter lämnas kvar. Firebase-kontot finns kvar.
             </p>
             <p>
-              <span className="font-medium text-ink">Radera alla uppgifter om mig.</span> Det är radering enligt dataskyddsförordningen (GDPR). Profil, ansökningar, sparade sökningar och filter, meddelanden och notiser, sparade inloggningar hos hyresvärdar och loggar som pekar på dig tas bort. Prenumerationen avslutas. Stripe-kunden anonymiseras, och Firebase-kontot tas bort.
+              <span className="font-medium text-ink">Radera alla uppgifter om mig.</span> Det är radering enligt dataskyddsförordningen (GDPR). Profil, ansökningar, recensioner, sparade sökningar och filter, meddelanden och notiser, supportärenden och chattar med support, sparade inloggningar hos hyresvärdar och loggar som pekar på dig tas bort. Prenumerationen avslutas. Stripe-kunden anonymiseras, och Firebase-kontot tas bort.
             </p>
             <p>
               Fakturor och andra betalunderlag behålls, eftersom bokföringslagen kräver det. De kopplas inte längre till ditt namn eller din e-post.
@@ -101,6 +127,7 @@ export function Help() {
               </a>
               .
             </p>
+            <SupportDesk heading={false} />
           </div>
         </section>
       </div>

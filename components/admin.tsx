@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Boot } from "@/components/boot";
+import { SupportUnreadBadge } from "@/components/support-admin";
 import { LandlordLogo } from "@/components/landlord-logo";
 import { Mark } from "@/components/mark";
 import { Button, Field, Switch, cx } from "@/components/ui";
@@ -19,6 +20,8 @@ const NAV = [
   { href: "/admin/kallor", label: "Källor" },
   { href: "/admin/anvandare", label: "Användare" },
   { href: "/admin/utskick", label: "Utskick" },
+  { href: "/admin/recensioner", label: "Recensioner" },
+  { href: "/admin/arenden", label: "Ärenden" },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -44,11 +47,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cx(
-                  "shrink-0 rounded-full px-3 py-2 text-sm md:rounded-2xl",
+                  "inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm md:rounded-2xl",
                   active ? "bg-ink text-paper" : "text-soft hover:bg-card",
                 )}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.href === "/admin/arenden" ? <SupportUnreadBadge /> : null}
               </Link>
             );
           })}

@@ -870,7 +870,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const fresh = latest();
       if (!fresh) return;
       const nextConnections = { ...fresh.connections };
-      for (const row of connections as { source_id: string; status: string; username?: string; last_error?: string | null }[]) {
+      for (const row of connections as {
+        source_id: string;
+        status: string;
+        username?: string;
+        last_error?: string | null;
+        last_kept_alive_at?: string | null;
+        next_keepalive_at?: string | null;
+        keepalive_state?: string | null;
+        last_keepalive_code?: string | null;
+        keepalive_strategy?: string | null;
+        keepalive_notice?: string | null;
+        fee_due_at?: string | null;
+      }[]) {
         const status =
           row.status === "active"
             ? "connected"
@@ -885,16 +897,38 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           email: row.username || nextConnections[row.source_id]?.email,
           detail: row.last_error || undefined,
           bankIdSession: status === "needs_bankid" || status === "connected" && fresh.sources.find((item) => item.id === row.source_id)?.requiresBankId,
+          lastKeptAliveAt: row.last_kept_alive_at,
+          nextKeepaliveAt: row.next_keepalive_at,
+          keepaliveState: row.keepalive_state,
+          keepaliveCode: row.last_keepalive_code,
+          keepaliveStrategy: row.keepalive_strategy,
+          keepaliveNotice: row.keepalive_notice,
+          feeDueAt: row.fee_due_at,
         };
       }
-      const remoteNotices = (notices as { id: string; title: string; body: string; read: boolean; at?: string }[]).map((notice) => ({
+      const remoteNotices = (notices as {
+        id: string;
+        title: string;
+        body: string;
+        read: boolean;
+        at?: string;
+        kind?: string;
+        action_label?: string;
+        action_href?: string;
+        secondary_label?: string;
+        secondary_href?: string;
+      }[]).map((notice) => ({
         id: `api-${notice.id}`,
-        kind: "system" as const,
+        kind: notice.kind?.includes("fee") ? ("fee" as const) : ("system" as const),
         title: notice.title,
         body: notice.body,
         at: notice.at || new Date().toISOString(),
         read: Boolean(notice.read),
-        href: "/notiser",
+        href: notice.action_href && !notice.action_href.startsWith("http") ? notice.action_href : "/notiser",
+        actionLabel: notice.action_label || undefined,
+        actionHref: notice.action_href || undefined,
+        secondaryLabel: notice.secondary_label || undefined,
+        secondaryHref: notice.secondary_href || undefined,
       }));
       const remoteIds = new Set(remoteNotices.map((notice) => notice.id));
       const remoteListings = ((listingBody.listings || []) as Record<string, unknown>[]).map(remoteListing);

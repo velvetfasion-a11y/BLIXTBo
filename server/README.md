@@ -79,4 +79,12 @@ These are not automated, on purpose:
 
 A captcha, a 403 or a 429 pauses the job (`waiting_user`) and does not retry. A missing field pauses as "sidan har ändrats". Wrong password and a dead session pause as `needs_user`.
 
+## Keep-alive
+
+Paying users (Premium, including the trial) get one read-only login per connected landlord about every 24 hours. The gap is `KEEPALIVE_INTERVAL_HOURS_<SOURCE>` if that variable is set, otherwise 24. Each run is jittered by a couple of hours and kept inside 07:00–22:00 Europe/Stockholm. Qasa, Akelius and Bostadsförmedlingen are never called. Bostadsförmedlingen, Uppsala, Boplats Syd and Boplats Göteborg only remind the user about a date they typed in. The app shows "Hålls aktiv · senast …" on the connection.
+
+A wrong password stops the retries. The notice says the login no longer works and the button opens the password screen for that landlord. Saving the password checks the login once, then keep-alive resumes about six hours later.
+
+Mail uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM`. If any of them is empty, mail is skipped. At most one message per user per day, and only when the user has to do something. Nothing in the message is a password or a token.
+
 Admin list endpoints return email, name, and connection status. They do not select the ciphertext or the wrapped key.

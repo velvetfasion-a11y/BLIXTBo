@@ -58,6 +58,11 @@ service cloud.firestore {
         allow read: if signedInAs(uid);
         allow write: if false;
       }
+
+      match /reviews/{reviewId} {
+        allow read: if signedInAs(uid);
+        allow write: if false;
+      }
     }
 
     // Landlord passwords and session cookies. Admin SDK only.

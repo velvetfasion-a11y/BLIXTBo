@@ -112,8 +112,11 @@ def test_renewal_pauses_and_notifies_without_a_second_job():
     queue_due_renewals(db)
     queue_due_renewals(db)
     db.commit()
-    renewals = db.query(Job).filter_by(user_id=user.id, source_id="bostadsformedlingen", kind="renew").all()
-    assert len(renewals) == 1
+    # Fee queues are not renewed by the old job. A renew that does exist still pauses for BankID.
+    assert db.query(Job).filter_by(user_id=user.id, source_id="bostadsformedlingen", kind="renew").count() == 0
+    renewals = [Job(user_id=user.id, source_id="bostadsformedlingen", kind="renew", payload="{}")]
+    db.add(renewals[0])
+    db.commit()
     run_job(db, renewals[0])
     db.commit()
     assert renewals[0].status == "waiting_bankid"

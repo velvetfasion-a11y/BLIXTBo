@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SUPPORT_EMAIL } from "@/lib/company";
 
 const LINKS = [
+  { href: "/guider", label: "Guider" },
   { href: "/villkor", label: "Villkor" },
   { href: "/integritet", label: "Integritet" },
   { href: "/hjalp", label: "Hjälp" },

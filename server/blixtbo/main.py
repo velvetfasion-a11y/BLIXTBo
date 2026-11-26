@@ -7,7 +7,7 @@ import httpx
 import pyotp
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy.orm import Session
 
@@ -35,7 +35,7 @@ app = FastAPI(title="Blixtbo", docs_url=None, redoc_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:43123", "http://localhost:43123"],
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["POST", "PUT", "GET", "OPTIONS"],
     allow_headers=["*"],
 )
 serializer = URLSafeTimedSerializer(settings.app_secret, salt="blixtbo-session")
@@ -585,10 +585,40 @@ def save_session(source_id: str, body: dict, user: User = Depends(require_user),
     return {"queued": True, "source_id": source_id}
 
 
+@app.put("/connections/{source_id}/fee-due")
+def set_fee_due(source_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    """The user types the queue-fee date. We never guess it and we never pay it."""
+    from blixtbo.keepalive import effective_strategy, parse_fee_date
+
+    if effective_strategy(source_id) != "fee_reminder":
+        raise HTTPException(status_code=400, detail="Den här hyresvärden har ingen köavgift att påminna om.")
+    try:
+        due = parse_fee_date((body or {}).get("date"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Skriv datumet som ÅÅÅÅ-MM-DD.")
+    login = db.query(LandlordLogin).filter_by(user_id=user.id, source_id=source_id).one_or_none()
+    if login is None:
+        raise HTTPException(status_code=404, detail="Ingen koppling.")
+    login.fee_due_at = due
+    login.keepalive_state = "fee_due"
+    db.commit()
+    return public_connection(login)
+
+
 @app.get("/connections")
 def list_connections(user: User = Depends(require_user), db: Session = Depends(get_db)) -> list:
+    from blixtbo.keepalive import effective_strategy, latest_notice_title
+
     rows = db.query(LandlordLogin).filter_by(user_id=user.id).all()
-    return [public_connection(row) for row in rows]
+    views = []
+    for row in rows:
+        view = public_connection(row)
+        view["keepalive_strategy"] = effective_strategy(row.source_id, row)
+        notice = latest_notice_title(db, user.id, row.source_id)
+        if notice:
+            view["keepalive_notice"] = notice
+        views.append(view)
+    return views
 
 
 @app.get("/notices")
@@ -602,6 +632,10 @@ def list_notices(user: User = Depends(require_user), db: Session = Depends(get_d
             "body": row.body,
             "read": row.read,
             "at": row.created_at.isoformat() if row.created_at else None,
+            "action_label": row.action_label or "",
+            "action_href": row.action_href or "",
+            "secondary_label": row.secondary_label or "",
+            "secondary_href": row.secondary_href or "",
         }
         for row in rows
     ]
@@ -720,3 +754,72 @@ def admin_users(owner: User = Depends(require_owner), db: Session = Depends(get_
     audit(db, owner.email, "admin.users")
     rows = db.query(User).order_by(User.created_at.desc()).limit(200).all()
     return [{"id": row.id, "email": row.email, "name": row.name, "method": row.auth_method} for row in rows]
+
+
+def _review_error(exc):
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@app.get("/reviews")
+def reviews_mine(user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, list_my_reviews
+
+    try:
+        return {"reviews": list_my_reviews(db, user)}
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.post("/reviews")
+def reviews_create(body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, create_review
+
+    try:
+        return create_review(db, user, body)
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.put("/reviews/{application_id}")
+def reviews_update(application_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, update_review
+
+    try:
+        return update_review(db, user, application_id, body)
+    except ReviewError as exc:
+        _review_error(exc)
+
+
+@app.get(settings.admin_path + "/reviews.csv")
+def reviews_admin_csv(rating: str | None = None, owner: User = Depends(require_owner), db: Session = Depends(get_db)) -> Response:
+    from blixtbo.reviews import ReviewError, admin_reviews_csv
+
+    try:
+        body = admin_reviews_csv(db, rating)
+    except ReviewError as exc:
+        _review_error(exc)
+    audit(db, owner.email, "admin.reviews.csv", rating or "")
+    return Response(
+        content=body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="recensioner.csv"'},
+    )
+
+
+@app.get(settings.admin_path + "/reviews")
+def reviews_admin(rating: str | None = None, owner: User = Depends(require_owner), db: Session = Depends(get_db)) -> dict:
+    from blixtbo.reviews import ReviewError, admin_reviews
+
+    try:
+        payload = admin_reviews(db, rating)
+    except ReviewError as exc:
+        _review_error(exc)
+    audit(db, owner.email, "admin.reviews", rating or "")
+    return payload
+
+
+from blixtbo.support import register as register_support
+
+register_support(app, get_db, require_user)
