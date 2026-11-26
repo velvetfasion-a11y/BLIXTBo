@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { IconChevron } from "@/components/icons";
+import { SupportDesk } from "@/components/support";
 import { Button, Field } from "@/components/ui";
 import { DELETE_SCOPES, confirmationMatches, needsRecentLogin, type DeleteScope } from "@/lib/account";
 import { apiFetch } from "@/lib/api";
@@ -152,6 +153,8 @@ export function Settings() {
           </Link>
         </li>
       </ul>
+
+      <SupportDesk />
 
       <section className="mt-10">
         <h2 className="font-serif text-2xl tracking-[-0.03em]">Radera eller koppla bort</h2>

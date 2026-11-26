@@ -720,3 +720,8 @@ def admin_users(owner: User = Depends(require_owner), db: Session = Depends(get_
     audit(db, owner.email, "admin.users")
     rows = db.query(User).order_by(User.created_at.desc()).limit(200).all()
     return [{"id": row.id, "email": row.email, "name": row.name, "method": row.auth_method} for row in rows]
+
+
+from blixtbo.support import register as register_support
+
+register_support(app, get_db, require_user)

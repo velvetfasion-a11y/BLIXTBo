@@ -27,10 +27,14 @@ def _create_index_if_not_exists(element, compiler, **kw):
 def init_db() -> None:
     """Create missing tables, then add columns that create_all will not.
 
+    Support tables live in support_models and use the same CREATE TABLE IF NOT EXISTS hook.
+
     CREATE TABLE IF NOT EXISTS is not enough when the api and the worker boot
     together: both can pass the catalog check and one then fails on pg_type.
     A transaction advisory lock makes that startup one-at-a-time on PostgreSQL.
     """
+    from blixtbo import support_models  # noqa: F401
+
     if engine.dialect.name == "postgresql":
         with engine.begin() as conn:
             conn.execute(text("SELECT pg_advisory_xact_lock(hashtext('blixtbo-schema'))"))

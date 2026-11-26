@@ -36,7 +36,7 @@ export const DELETE_SCOPES: DeleteChoice[] = [
     id: "account",
     title: "Radera bara Blixtbo-kontot",
     summary: "Kontot stängs och går inte att logga in på. Sådant som inte är själva kontot lämnas kvar.",
-    removes: ["Namn, e-post och kopplingen till inloggningen i Blixtbo", "Möjligheten att öppna det här kontot"],
+    removes: ["Namn, e-post och kopplingen till inloggningen i Blixtbo", "Supportärenden och chattar med support", "Möjligheten att öppna det här kontot"],
     keeps: [
       "Profil, ansökningar, sparade sökningar och filter",
       "Meddelanden och notiser",
@@ -54,6 +54,7 @@ export const DELETE_SCOPES: DeleteChoice[] = [
       "Profil, ansökningar, köer, svep och erbjudanden",
       "Sparade sökningar och filter",
       "Meddelanden och notiser",
+      "Supportärenden och chattar med support",
       "Sparade inloggningar hos hyresvärdar",
       "Loggar som pekar på dig",
       "Prenumerationen avslutas",
@@ -69,7 +70,7 @@ export const DELETE_SCOPES: DeleteChoice[] = [
     title: "Koppla bort länkade konton",
     summary: "Blixtbo-kontot finns kvar. Inloggningar som appen har sparat hos andra tas bort.",
     removes: ["Sparade inloggningar hos hyresvärdar", "Kopplingen till Google och Apple"],
-    keeps: ["Blixtbo-kontot, profilen, ansökningar, filter och meddelanden", "Prenumerationen", "Loggar"],
+    keeps: ["Blixtbo-kontot, profilen, ansökningar, filter och meddelanden", "Supportärenden och chattar", "Prenumerationen", "Loggar"],
     caution: "Om Google eller Apple är ditt enda sätt att logga in behöver du en ny inloggning nästa gång. Kontot och uppgifterna finns kvar.",
   },
 ];

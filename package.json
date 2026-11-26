@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 43123",
-    "build": "next build",
+    "build": "node scripts/build-support-knowledge.mjs && next build",
     "start": "next start -H 0.0.0.0 -p 43123",
     "lint": "eslint",
     "test:rules": "firebase emulators:exec --only firestore --project blixtbo-rules \"node tests/firestore.rules.test.mjs\"",
