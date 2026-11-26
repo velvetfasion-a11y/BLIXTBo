@@ -1,40 +1,28 @@
 import { FaqList } from "@/components/faq-list";
 import { LandingNotice } from "@/components/landing-notice";
-import { LandlordBoard } from "@/components/landlord-board";
+import { LandlordLogoCloud } from "@/components/landlord-logo-cloud";
 import { Wordmark } from "@/components/mark";
 import { SiteFooter } from "@/components/site-footer";
 import { HOME_H1, HOME_SECTIONS, HOME_STEPS, HOME_SUBLINE, includedCopy } from "@/lib/seo";
-
-const VALUE_POINTS = [
-  "Nya annonser från hyresvärdarna, samlade efter område, hyra och storlek.",
-  "En profil räcker. Ett svep skickar ansökan innan de andra hunnit läsa klart.",
-  "Ködagar och en påminnelse när en kö behöver förnyas.",
-] as const;
 
 export function Landing({ signIn }: { signIn: React.ReactNode }) {
   return (
     <div className="min-h-dvh bg-paper">
       <main>
-      <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <Wordmark />
         <LandingNotice />
-        <div className="mt-6 grid items-start gap-8 md:mt-8 md:grid-cols-[minmax(0,1fr)_320px] md:gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-10">
+        <div className="mt-8 grid items-center gap-10 md:grid-cols-[minmax(0,1fr)_320px] md:gap-8 lg:mt-12 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-12">
           <div className="min-w-0">
-            <h1 className="max-w-xl font-serif text-[1.75rem] leading-[1.08] tracking-[-0.035em] sm:text-4xl lg:text-5xl lg:leading-[1.05]">
+            <h1 className="font-serif text-4xl leading-[1.05] tracking-[-0.035em] sm:text-5xl lg:text-[3.4rem]">
               {HOME_H1}
             </h1>
-            <p className="mt-3 max-w-xl text-base leading-relaxed text-soft sm:mt-4 sm:text-lg">{HOME_SUBLINE}</p>
-            <ul className="mt-4 max-w-xl space-y-2.5">
-              {VALUE_POINTS.map((point) => (
-                <li key={point} className="flex gap-2.5 text-sm leading-5 text-ink sm:text-[15px] sm:leading-6">
-                  <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-pine" />
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
-            <LandlordBoard />
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-soft sm:text-lg">{HOME_SUBLINE}</p>
+            <div className="mt-8">
+              <LandlordLogoCloud />
+            </div>
           </div>
-          <div className="mx-auto w-full max-w-[440px] md:mx-0 md:max-w-none md:sticky md:top-6">{signIn}</div>
+          <div className="mx-auto w-full max-w-[400px] md:mx-0 md:max-w-none">{signIn}</div>
         </div>
       </div>
 
