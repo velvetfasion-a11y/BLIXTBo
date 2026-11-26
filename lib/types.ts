@@ -141,6 +141,13 @@ export type Connection = {
   detail?: string;
   connectedAt?: string;
   bankIdSession?: boolean;
+  lastKeptAliveAt?: string | null;
+  nextKeepaliveAt?: string | null;
+  keepaliveState?: string | null;
+  keepaliveCode?: string | null;
+  keepaliveStrategy?: string | null;
+  keepaliveNotice?: string | null;
+  feeDueAt?: string | null;
 };
 
 export type AppStatus = "skickad" | "visning" | "erbjuden" | "accepterad" | "avbojd" | "kontrakt" | "nekad" | "aterkallad";
@@ -196,6 +203,10 @@ export type Notice = {
   read: boolean;
   href: string;
   deadlineAt?: string;
+  actionLabel?: string;
+  actionHref?: string;
+  secondaryLabel?: string;
+  secondaryHref?: string;
 };
 
 export type Billing = {

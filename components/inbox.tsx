@@ -6,7 +6,7 @@ import { Countdown } from "@/components/countdown";
 import { EmptyState } from "@/components/ui";
 import { formatDateTime, relative } from "@/lib/format";
 import { useStore } from "@/lib/store";
-import type { NoticeKind } from "@/lib/types";
+import type { Notice, NoticeKind } from "@/lib/types";
 
 const KIND: Record<NoticeKind, string> = {
   listing: "Ny bostad",
@@ -71,25 +71,46 @@ export function Inbox() {
               <h2 className="text-xs font-medium tracking-wide text-faint">{groupItem.label}</h2>
               <ul className="mt-2 divide-y divide-line overflow-hidden rounded-3xl border border-line bg-card">
                 {groupItem.items.map((notice) => (
-                  <li key={notice.id}>
-                    <button
-                      type="button"
-                      className="flex w-full gap-3 px-4 py-4 text-left"
-                      onClick={() => {
-                        store.markRead(notice.id);
-                        router.push(notice.href);
-                      }}
-                    >
+                  <li key={notice.id} className="px-4 py-4">
+                    <div className="flex gap-3">
                       <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${notice.read ? "bg-transparent" : "bg-pine"}`} />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-baseline justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-3">
                           <span className="text-xs text-soft">{KIND[notice.kind]}</span>
                           <span className="text-xs text-faint">{relative(notice.at)}</span>
-                        </span>
-                        <span className="mt-1 block font-medium">{notice.title}</span>
-                        <span className="mt-1 block text-sm leading-relaxed text-soft">{notice.body}</span>
-                      </span>
-                    </button>
+                        </div>
+                        <p className="mt-1 font-medium">{notice.title}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-soft">{notice.body}</p>
+                        {notice.actionHref ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <NoticeLink
+                              href={notice.actionHref}
+                              label={notice.actionLabel || "Öppna"}
+                              onOpen={() => store.markRead(notice.id)}
+                            />
+                            {notice.secondaryHref ? (
+                              <NoticeLink
+                                href={notice.secondaryHref}
+                                label={notice.secondaryLabel || "Öppna"}
+                                quiet
+                                onOpen={() => store.markRead(notice.id)}
+                              />
+                            ) : null}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="mt-2 text-sm text-clay"
+                            onClick={() => {
+                              store.markRead(notice.id);
+                              router.push(notice.href);
+                            }}
+                          >
+                            Visa
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -101,7 +122,37 @@ export function Inbox() {
   );
 }
 
-function group(notices: { id: string; at: string; kind: NoticeKind; title: string; body: string; read: boolean; href: string }[]) {
+function external(href: string) {
+  return href.startsWith("http://") || href.startsWith("https://");
+}
+
+function NoticeLink({ href, label, onOpen, quiet = false }: { href: string; label: string; onOpen: () => void; quiet?: boolean }) {
+  const router = useRouter();
+  const className = quiet
+    ? "inline-flex h-9 items-center rounded-full border border-line px-3 text-sm"
+    : "inline-flex h-9 items-center rounded-full bg-ink px-3 text-sm font-medium text-paper";
+  if (external(href)) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className={className} onClick={onOpen}>
+        {label}
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => {
+        onOpen();
+        router.push(href);
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function group(notices: Notice[]) {
   const today: typeof notices = [];
   const yesterday: typeof notices = [];
   const older: typeof notices = [];

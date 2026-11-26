@@ -26,11 +26,15 @@ def _body(secret: dict) -> dict:
     }
 
 
-def login(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+def login(client: httpx.Client, secret: dict, guard: SiteGuard | None = None, *, keepalive: bool = False) -> StepResult:
     try:
         response = request(client, "POST", LOGIN, guard, json=_body(secret), headers=_headers())
     except RobotsBlocked:
         return paused("captcha", "Stena tillåter inte anropet", "Robots.txt spärrar inloggningen. Inget skickades.")
+    if keepalive and response.status_code >= 500:
+        return paused("unreachable", "Vi når inte Stena just nu", "Vi försöker igen senare.")
+    if keepalive and response.status_code == 429:
+        return paused("rate_limited", "Stena vill att du tar över", "Stena ber oss vänta. Vi försöker inte igen nu.")
     if captcha(response.status_code, response.text):
         return paused("captcha", "Stena vill att du tar över", "Stena visar en kontroll. Vi försöker inte igen.")
     text = response.text.lower()
@@ -81,6 +85,26 @@ def apply(client: httpx.Client, secret: dict, payload: dict, guard: SiteGuard | 
     if response.status_code >= 400:
         return paused("site_changed", "Stena tog inte emot anmälan", "Försöket är pausat.")
     return finished("Intresseanmälan skickad till Stena", "Ansökan är skickad hos Stena.", "applied")
+
+
+def keepalive(client: httpx.Client, secret: dict, guard: SiteGuard | None = None) -> StepResult:
+    """Login plus one GET of Mina sidor. Stena has no queue to claim."""
+    signed = login(client, secret, guard, keepalive=True)
+    if not signed.ok:
+        return signed
+    try:
+        page = request(client, "GET", "https://minasidor.stenafastigheter.se/", guard, follow_redirects=False)
+    except RobotsBlocked:
+        return paused("captcha", "Stena vill att du tar över", "Robots.txt spärrar sidan. Inget mer skickades.")
+    except httpx.TransportError:
+        return paused("unreachable", "Vi når inte Stena just nu", "Vi försöker igen senare.")
+    if page.status_code >= 500:
+        return paused("unreachable", "Vi når inte Stena just nu", "Vi försöker igen senare.")
+    if page.status_code == 429:
+        return paused("rate_limited", "Stena vill att du tar över", "Stena ber oss vänta. Vi försöker inte igen nu.")
+    if captcha(page.status_code, page.text):
+        return paused("captcha", "Stena vill att du tar över", "Stena visar en kontroll. Vi försöker inte igen.")
+    return finished("Stena är kollat", "Inloggningen hos Stena fungerar. Det finns ingen köplats att hålla.", "queue_ok")
 
 
 def renew(client: httpx.Client, secret: dict, payload: dict, guard: SiteGuard | None = None) -> StepResult:

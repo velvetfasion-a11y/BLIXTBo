@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -44,6 +44,13 @@ class LandlordLogin(Base):
     last_error: Mapped[str | None] = mapped_column(String(64))
     next_renewal_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_kept_alive_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_keepalive_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_keepalive_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    keepalive_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    keepalive_state: Mapped[str | None] = mapped_column(String(24))
+    last_keepalive_code: Mapped[str | None] = mapped_column(String(64))
+    fee_due_at: Mapped[date | None] = mapped_column(Date)
 
 
 class Approval(Base):
@@ -76,11 +83,15 @@ class Notice(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
-    kind: Mapped[str] = mapped_column(String(40))
+    kind: Mapped[str] = mapped_column(String(80))
     title: Mapped[str] = mapped_column(String(160))
     body: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
+    action_label: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    action_href: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    secondary_label: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    secondary_href: Mapped[str] = mapped_column(String(500), default="", server_default="")
 
 
 class AuditLog(Base):
