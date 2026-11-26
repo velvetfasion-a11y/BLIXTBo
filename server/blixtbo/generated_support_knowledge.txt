@@ -8,7 +8,7 @@ En ansökan skickas bara när användaren själv sveper ja eller bekräftar i ap
 
 Köplatser kan hållas aktiva under Profil, med valet Håll mina köplatser aktiva automatiskt. Då loggar Blixtbo in hos hyresvärden och bekräftar kön. En missad förnyelse kan nollställa kötid. BankID sparas aldrig. Hyresvärdens lösenord sparas krypterat.
 
-Premium kostar 99 kr per månad. Det håller köplatser aktiva och förnyar dem, skickar ansökan först och bevakar hyresvärdarnas annonser och köer. Blixtbo äger inga lägenheter.
+Premium kostar 99 kr per månad. Det håller köplatser aktiva och förnyar dem, hjälper dig bli först till kvarn och bevakar hyresvärdarnas annonser och köer. Blixtbo äger inga lägenheter.
 
 Uppsägning, paus och ånger görs under Inställningar och sedan Prenumeration, eller genom att skriva till support. Assistenten lovar aldrig en återbetalning. En människa avgör betalningsärenden.
 
@@ -90,7 +90,7 @@ Steg för steg om personbevis, köer, borgen och vad hyresvärdar brukar kräva.
 Hur Blixtbo fungerar
 Blixtbo bevakar hyresvärdarnas annonser och lägger nya bostäder överst. Du anger område, hyra, storlek och inflytt en gång. Ett ja kan skicka ansökan med profilen du redan fyllt i.
 Samma profil används hos varje hyresvärd: yrke, inkomst, hushåll, brev och dokument. Under Koll ser du ansökningar, ködagar och när en kö behöver förnyas.
-Premium håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna.
+Premium håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna.
 Betalning och avslut
 Avsluta prenumerationen via Inställningar och sedan Prenumeration. Du behåller Premium tills den betalda perioden tar slut. Därefter blir kontot gratis, och inga fler dragningar görs. Du kan ångra ett planerat avslut innan perioden tar slut, på samma sida.
 En paus stänger av automatiska ansökningar utan att avsluta kontot. Den finns också under Prenumeration.
@@ -143,21 +143,21 @@ Förhandsvisning för ägaren
 Återställ prototypen
 
 ## lib/seo.ts
-Lediga lägenheter i Stockholm – ansök först | Blixtbo
-Se lediga hyresrätter och förstahandskontrakt i Stockholm på ett ställe. Blixtbo bevakar annonserna och köerna och skickar din ansökan först.
-Se alla lediga lägenheter på ett ställe – och ansök först
+Blixtbo: Lediga lägenheter i Stockholm – bli först till kvarn
+Se lediga hyresrätter och förstahandskontrakt i Stockholm på ett ställe. Blixtbo bevakar annonserna och köerna, så att du kan bli först till kvarn.
+Se alla lediga lägenheter på ett ställe – och bli först till kvarn
 Blixtbo bevakar hyresvärdarnas annonser och bostadsköer åt dig. Ett svep, så skickas din ansökan innan de andra hunnit läsa klart.
 Ha koll på alla bostäder och köer
 Nya hyresrätter och förstahandskontrakt hamnar överst, med de områden, den hyra och den storlek du valt. Under Koll ser du dina ansökningar, ködagar och när en kö behöver förnyas, så att du inte förlorar kötid.
 Ansök direkt – utan att fylla i allt om och om igen
-Du fyller i din profil en gång: yrke, inkomst, hushåll, personligt brev och dokument. Ett svep på en ledig lägenhet skickar ansökan med samma profil. Hyresvärden bestämmer vem som får lägenheten och skriver kontraktet med dig. Blixtbo gör att du hinner först med ansökan.
+Du fyller i din profil en gång: yrke, inkomst, hushåll, personligt brev och dokument. Ett svep på en ledig lägenhet skickar ansökan med samma profil. Hyresvärden bestämmer vem som får lägenheten och skriver kontraktet med dig. Blixtbo gör att du kan bli först till kvarn.
 Hyresrätter i Stockholm, där du vill bo
 Bevaka innerstan, Gärdet och Hjorthagen, Hammarby Sjöstad, Liljeholmen, Solna och Sundbyberg. Välj max hyra och våning, så får du bara lägenheter som passar.
 Välj område, hyra och storlek.
 Fyll i din profil en gång.
 Svep på en ledig lägenhet för att skicka ansökan.
 Följ ansökningar och köer under Koll.
-Premium håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna. kr/månad. Avsluta när du vill under Inställningar.
+Premium håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna. kr/månad. Avsluta när du vill under Inställningar.
 Var hittar jag lediga lägenheter i Stockholm?
 Hyresvärdarna annonserar på sina egna sidor, hos Bostadsförmedlingen och på andra portaler. Blixtbo bevakar annonserna åt dig och visar nya lägenheter som matchar dina val, så du slipper kolla flera ställen själv.
 Hur får jag ett förstahandskontrakt i Stockholm?
@@ -173,7 +173,7 @@ Nej. Blixtbo äger inga lägenheter och förmedlar inte kontrakt. Vi bevakar hyr
 Kan jag hyra lägenhet utan inkomst?
 Det är svårt. De flesta hyresvärdar kräver inkomst eller borgensman. Några har andra villkor, så läs kraven i annonsen innan du ansöker. Blixtbo lovar inte att du blir godkänd.
 Vad kostar Blixtbo?
-Premium kostar kr/månad. Det håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna. Du avslutar under Inställningar, Prenumeration.
+Premium kostar kr/månad. Det håller köplatser aktiva, hjälper dig bli först till kvarn och bevakar hyresvärdarna. Du avslutar under Inställningar, Prenumeration.
 Vilka områden kan jag söka i?
 Innerstan, Gärdet och Hjorthagen, Hammarby Sjöstad, Liljeholmen, Solna och Sundbyberg. Fler områden kommer.
 Vad är skillnaden mellan första och andra hand?
@@ -219,7 +219,7 @@ Betalningen gick inte att starta.
 Familjen Grotesk, Avenir Next, sans-serif
 Kortet gick inte att bekräfta.
 Håller dina köplatser aktiva och förnyar dem.
-Skickar ansökan först, med profilen du redan fyllt i.
+Skickar din ansökan med profilen du redan fyllt i, så att du kan bli först till kvarn.
 Bevakar hyresvärdarnas annonser och köer.
 Kortfältet kräver en pk_test_- eller pk_live_-nyckel.
 Logga in med Google så att betalningen stannar i appen.

@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Blixtbo – lediga lägenheter i Stockholm. Ansök först.";
+export const alt = "Blixtbo – lediga lägenheter i Stockholm. Bli först till kvarn.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -31,7 +31,7 @@ export default function OpenGraphImage() {
             <rect width="32" height="32" rx="9" fill="#F3F0EA" />
             <path d="M17.6 6.2 9.4 17.4h6.3l-1.7 8.4 8.6-12.1h-6.5l1.5-7.5Z" fill="#146048" />
           </svg>
-          <div style={{ display: "flex", color: "#F3F0EA", fontSize: 28, fontWeight: 600 }}>Ansök först</div>
+          <div style={{ display: "flex", color: "#F3F0EA", fontSize: 24, fontWeight: 600, lineHeight: 1.2, maxWidth: 168 }}>Bli först till kvarn</div>
         </div>
         <div
           style={{
