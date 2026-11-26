@@ -67,7 +67,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </p>
             <p className="mt-1 text-xs leading-relaxed text-soft">{sourcesOn} hyresvärdar bevakas just nu.</p>
           </div>
-          <footer className="mt-4 px-3 pb-2">
+          <footer className="mt-4 flex flex-col gap-2 px-3 pb-2">
+            <Link href="/guider" className="text-sm font-medium text-soft hover:text-ink">
+              Guider
+            </Link>
             <Link href="/hjalp" className="text-sm font-medium text-soft hover:text-ink">
               Hjälp
             </Link>
@@ -76,7 +79,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </aside>
       <div className="pb-28 md:pb-0">{children}</div>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/92 backdrop-blur md:hidden">
-        <div className="mx-auto flex max-w-lg justify-center pt-2">
+        <div className="mx-auto flex max-w-lg justify-center gap-4 pt-2">
+          <Link href="/guider" className="text-xs font-medium text-soft">
+            Guider
+          </Link>
           <Link href="/hjalp" className="text-xs font-medium text-soft">
             Hjälp
           </Link>
