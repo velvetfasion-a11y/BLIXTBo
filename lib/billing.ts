@@ -1,8 +1,7 @@
 import type { Billing, Filters, Listing, Source } from "@/lib/types";
 
-export const DEFAULT_FREE_AUTO_APPLIES = 2;
+export const DEFAULT_FREE_AUTO_APPLIES = 5;
 export const DEFAULT_PREMIUM_KR = 99;
-export const DEFAULT_TRIAL_DAYS = 3;
 
 export function freeAutoApplyLimit() {
   const raw = Number(process.env.NEXT_PUBLIC_FREE_AUTO_APPLY_LIMIT ?? DEFAULT_FREE_AUTO_APPLIES);
@@ -14,20 +13,16 @@ export function premiumPriceKr() {
   return raw > 0 ? raw : DEFAULT_PREMIUM_KR;
 }
 
-export function trialDays() {
-  const raw = Number(process.env.NEXT_PUBLIC_TRIAL_DAYS ?? DEFAULT_TRIAL_DAYS);
-  return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_TRIAL_DAYS;
-}
-
 export function emptyBilling(): Billing {
   return { plan: "free", status: "free", usedAutoApplies: 0 };
 }
 
 export function billingLabel(billing: Billing) {
+  const price = premiumPriceKr();
   if (billing.status === "paused") return "Premium är pausat. Automatiska ansökningar är av.";
   if (billing.status === "canceled") return "Prenumerationen är avslutad.";
-  if (billing.plan === "premium" && billing.status === "active") return "Premium. Ansökningar går utan tak.";
-  return "Gratis. Ett par automatiska ansökningar ingår.";
+  if (billing.plan === "premium" && billing.status === "active") return `Premium är igång. ${price} kr i månaden.`;
+  return "Ingen Premium just nu.";
 }
 
 /** Premium that is not paused may auto-apply without a cap. A pause turns it off. */

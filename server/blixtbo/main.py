@@ -25,7 +25,7 @@ from blixtbo.account import (
     run_deletion,
     valid_uid,
 )
-from blixtbo.billing import as_dict, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, firebase_uid_from_event, is_stripe_secret_key, price_lookup_key, price_ore, resume_subscription, schedule_cancel, subscription_view
+from blixtbo.billing import allow_application, as_dict, client_secret_from_subscription, entitlement_from_event, entitlement_from_subscription, firebase_uid_from_event, is_stripe_secret_key, price_lookup_key, price_ore, resume_subscription, schedule_cancel, subscription_data, subscription_view
 from blixtbo.custom_landlords import apply_mode, fetch_listings, keep_listing, rank_candidates, rank_listings, search_web
 from blixtbo.matching import match_listing
 from blixtbo.models import AuditLog, Job, LandlordLogin, Notice, User
@@ -209,11 +209,10 @@ def billing_subscribe(request: Request, db: Session = Depends(get_db)) -> dict:
         subscription = stripe.Subscription.create(
             customer=customer.id,
             items=[{"price": price_id}],
-            trial_period_days=settings.trial_days,
             payment_behavior="default_incomplete",
             payment_settings={"save_default_payment_method": "on_subscription"},
-            metadata={"firebaseUid": user.firebase_uid},
             expand=["pending_setup_intent", "latest_invoice.payment_intent"],
+            **subscription_data(user.firebase_uid),
         )
     raw = subscription.to_dict() if hasattr(subscription, "to_dict") else subscription
     try:
@@ -241,7 +240,7 @@ def _reusable_subscription(stripe, customer_id: str):
     listed = stripe.Subscription.list(customer=customer_id, status="all", limit=10)
     for item in listed.data:
         status = str(getattr(item, "status", "") or item.get("status") or "")
-        if status not in ("incomplete", "trialing", "active", "paused"):
+        if status not in ("incomplete", "active", "paused"):
             continue
         full = stripe.Subscription.retrieve(
             item.id,
@@ -277,7 +276,7 @@ def _subscription_state(user: User):
     for item in getattr(listed, "data", None) or []:
         raw = as_dict(item)
         fallback = fallback or raw
-        if str(raw.get("status") or "") in ("active", "trialing", "paused", "past_due", "incomplete"):
+        if str(raw.get("status") or "") in ("active", "paused", "past_due", "incomplete"):
             chosen = raw
             break
     return stripe, chosen or fallback
@@ -665,6 +664,28 @@ def public_listings_client():
     return httpx.Client(timeout=20.0, follow_redirects=False)
 
 
+def _application_entitlement(user: User) -> dict | None:
+    if settings.data_backend != "firestore" or not user.firebase_uid:
+        return None
+    try:
+        from blixtbo.keepalive import read_entitlement
+
+        return read_entitlement(user.firebase_uid)
+    except Exception:
+        return None
+
+
+def applications_sent(db: Session, user_id: str, exclude_job_id: str | None = None) -> int:
+    query = db.query(Job).filter(Job.user_id == user_id, Job.kind == "apply", Job.status != "failed")
+    if exclude_job_id:
+        query = query.filter(Job.id != exclude_job_id)
+    return query.count()
+
+
+def _application_allowed(db: Session, user: User, exclude_job_id: str | None = None) -> bool:
+    return allow_application(applications_sent(db, user.id, exclude_job_id), _application_entitlement(user))
+
+
 @app.post("/listings/{listing_id}/apply")
 def apply(listing_id: str, body: dict, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
     source_id = str(body.get("source_id") or "")
@@ -677,6 +698,8 @@ def apply(listing_id: str, body: dict, user: User = Depends(require_user), db: S
     payload = build_apply_payload(listing_id, body)
     if (site.binding_apply or site.message_apply) and not payload.get("confirmed"):
         raise HTTPException(status_code=409, detail="Bekräfta i appen innan något skickas.")
+    if not _application_allowed(db, user):
+        raise HTTPException(status_code=402, detail="Premium krävs för att fortsätta.")
     db.add(Job(user_id=user.id, source_id=source_id, kind="apply", payload=json.dumps(payload, ensure_ascii=False)))
     db.commit()
     return {"queued": True, "listing_id": listing_id}

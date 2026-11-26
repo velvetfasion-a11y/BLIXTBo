@@ -1,6 +1,6 @@
-"""Stripe subscription entitlement. The monthly price and the trial length come from the environment.
+"""Stripe subscription entitlement. The monthly price comes from the environment.
 
-The app confirms a SetupIntent or PaymentIntent inside its own sheet. The trial is trial_period_days on the subscription, not a second price and not a coupon.
+The app confirms a PaymentIntent inside its own sheet. There is no trial period on the subscription.
 Cancelling keeps access until the period ends (cancel_at_period_end). It does not open a Stripe-hosted page.
 """
 
@@ -131,14 +131,33 @@ def ensure_billing_webhook(stripe, url: str = WEBHOOK_URL) -> str:
 
 
 def subscription_data(firebase_uid: str) -> dict:
-    return {
-        "trial_period_days": settings.trial_days,
-        "metadata": {"firebaseUid": firebase_uid},
-    }
+    """No trial_period_days unless TRIAL_DAYS is set above zero. The default is no trial."""
+    data: dict = {"metadata": {"firebaseUid": firebase_uid}}
+    if int(settings.trial_days) > 0:
+        data["trial_period_days"] = int(settings.trial_days)
+    return data
+
+
+def premium_is_unlimited(entitlement: dict | None) -> bool:
+    """Paid Premium only. A Stripe trial does not unlock unlimited applications."""
+    if not entitlement:
+        return False
+    if entitlement.get("trial"):
+        return False
+    if entitlement.get("autoApply") is False:
+        return False
+    return entitlement.get("plan") == "premium" and entitlement.get("status") == "active"
+
+
+def allow_application(used: int, entitlement: dict | None = None, free_limit: int | None = None) -> bool:
+    limit = settings.free_auto_apply_limit if free_limit is None else free_limit
+    if premium_is_unlimited(entitlement):
+        return True
+    return used < limit
 
 
 def client_secret_from_subscription(subscription: dict) -> tuple[str, str]:
-    """Trial checkouts confirm a SetupIntent. A charge confirms the invoice PaymentIntent."""
+    """A saved card confirms a SetupIntent. A charge confirms the invoice PaymentIntent."""
     setup = subscription.get("pending_setup_intent")
     if isinstance(setup, dict) and setup.get("client_secret"):
         return str(setup["client_secret"]), "setup"
@@ -198,8 +217,10 @@ def entitlement_from_subscription(subscription: dict) -> dict:
         return {**base, "plan": "free", "status": "canceled", "autoApply": False}
     if paused or status == "paused":
         return {**base, "plan": "premium", "status": "paused", "autoApply": False}
-    if status in ("active", "trialing"):
-        return {**base, "plan": "premium", "status": "active", "autoApply": True, "trial": status == "trialing"}
+    if status == "trialing":
+        return {**base, "plan": "free", "status": "free", "autoApply": False, "trial": False}
+    if status == "active":
+        return {**base, "plan": "premium", "status": "active", "autoApply": True, "trial": False}
     return {**base, "plan": "free", "status": "free", "autoApply": False}
 
 
@@ -253,14 +274,7 @@ def entitlement_from_event(event: dict) -> dict | None:
         subscription = data.get("subscription")
         if isinstance(subscription, dict):
             return entitlement_from_subscription(subscription)
-        return {
-            "plan": "premium",
-            "status": "active",
-            "autoApply": True,
-            "trial": True,
-            "stripeCustomerId": data.get("customer") or "",
-            "stripeSubscriptionId": subscription or "",
-        }
+        return None
     if kind == "customer.subscription.updated":
         return entitlement_from_subscription(data)
     if kind == "customer.subscription.deleted":

@@ -1,10 +1,10 @@
-from blixtbo.billing import WEBHOOK_EVENTS, WEBHOOK_URL, can_auto_apply, client_secret_from_subscription, ensure_billing_webhook, ensure_premium_catalog, entitlement_from_event, entitlement_from_subscription, is_stripe_secret_key, period_end_iso, price_lookup_key, price_ore, redact_stripe_secret, resume_subscription, schedule_cancel, subscription_data, subscription_view
+from blixtbo.billing import WEBHOOK_EVENTS, WEBHOOK_URL, allow_application, can_auto_apply, client_secret_from_subscription, ensure_billing_webhook, ensure_premium_catalog, entitlement_from_event, entitlement_from_subscription, is_stripe_secret_key, period_end_iso, premium_is_unlimited, price_lookup_key, price_ore, redact_stripe_secret, resume_subscription, schedule_cancel, subscription_data, subscription_view
 from blixtbo.config import settings
 
 
-def test_price_is_99_sek_and_trial_is_three_days():
+def test_price_is_99_sek_and_there_is_no_trial():
     settings.premium_price_kr = 99
-    settings.trial_days = 3
+    settings.trial_days = 0
     assert price_ore() == 9900
     assert price_lookup_key() == "blixtbo_premium_monthly"
     assert is_stripe_secret_key("sk_test_abc")
@@ -20,7 +20,7 @@ def test_price_is_99_sek_and_trial_is_three_days():
     assert not is_stripe_secret_key(" sk_test_abc")
     assert not is_stripe_secret_key("not-a-key")
     data = subscription_data("uid-1")
-    assert data["trial_period_days"] == 3
+    assert "trial_period_days" not in data
     assert data["metadata"]["firebaseUid"] == "uid-1"
     secret, kind = client_secret_from_subscription({"pending_setup_intent": {"client_secret": "seti_secret"}})
     assert secret == "seti_secret" and kind == "setup"
@@ -28,15 +28,23 @@ def test_price_is_99_sek_and_trial_is_three_days():
     assert secret == "pi_secret" and kind == "payment"
 
 
-def test_free_limit_premium_trial_and_pause():
-    assert can_auto_apply("free", "free", 0, 2) is True
-    assert can_auto_apply("free", "free", 2, 2) is False
-    assert can_auto_apply("premium", "active", 9, 2) is True
-    assert can_auto_apply("premium", "paused", 0, 2) is False
+def test_free_limit_is_five_and_a_trial_is_not_unlimited():
+    assert can_auto_apply("free", "free", 4, 5) is True
+    assert can_auto_apply("free", "free", 5, 5) is False
+    assert can_auto_apply("premium", "active", 9, 5) is True
+    assert can_auto_apply("premium", "paused", 0, 5) is False
     trialing = entitlement_from_subscription({"id": "sub_1", "customer": "cus_1", "status": "trialing", "pause_collection": None})
-    assert trialing["plan"] == "premium"
-    assert trialing["autoApply"] is True
-    assert trialing["trial"] is True
+    assert trialing["plan"] == "free"
+    assert trialing["autoApply"] is False
+    assert trialing["trial"] is False
+    assert premium_is_unlimited(trialing) is False
+    assert allow_application(0, trialing, 5) is True
+    assert allow_application(5, trialing, 5) is False
+    paid = {"plan": "premium", "status": "active", "autoApply": True, "trial": False}
+    assert allow_application(9, paid, 5) is True
+    leftover = {"plan": "premium", "status": "active", "autoApply": True, "trial": True}
+    assert premium_is_unlimited(leftover) is False
+    assert allow_application(5, leftover, 5) is False
 
 
 def test_cancel_at_period_end_keeps_access_until_the_period_ends():
@@ -129,14 +137,14 @@ def test_webhook_events_map_to_entitlement():
         "type": "customer.subscription.created",
         "data": {"object": {"id": "sub_1", "customer": "cus_1", "status": "trialing", "metadata": {"firebaseUid": "uid-1"}}},
     })
-    assert created["plan"] == "premium"
-    assert created["trial"] is True
+    assert created["plan"] == "free"
+    assert created["autoApply"] is False
+    assert created["trial"] is False
     started = entitlement_from_event({
         "type": "checkout.session.completed",
         "data": {"object": {"customer": "cus_1", "subscription": "sub_1", "client_reference_id": "uid-1"}},
     })
-    assert started["plan"] == "premium"
-    assert started["trial"] is True
+    assert started is None
 
 
 class _Page:
@@ -210,7 +218,7 @@ class _CatalogStripe:
 
 def test_catalog_and_webhook_are_created_once_for_the_key_mode():
     settings.premium_price_kr = 99
-    settings.trial_days = 3
+    settings.trial_days = 0
     stripe = _CatalogStripe()
     product_id, price_id = ensure_premium_catalog(stripe)
     webhook_id = ensure_billing_webhook(stripe)
@@ -266,7 +274,7 @@ def test_setup_prints_ids_and_never_the_key(capsys):
     previous = settings.stripe_secret_key
     settings.stripe_secret_key = secret
     settings.premium_price_kr = 99
-    settings.trial_days = 3
+    settings.trial_days = 0
     stripe = _CatalogStripe()
     try:
         code = module.main(stripe)
@@ -276,7 +284,8 @@ def test_setup_prints_ids_and_never_the_key(capsys):
         assert "STRIPE_PRODUCT_ID=prod_1" in captured.out
         assert "STRIPE_PRICE_ID=price_1" in captured.out
         assert "STRIPE_WEBHOOK_ENDPOINT_ID=we_1" in captured.out
-        assert "99 kr/mån efter 3 dagars provperiod." in captured.out
+        assert "99 kr/mån." in captured.out
+        assert "provperiod" not in captured.out
         assert secret not in text
         assert "whsec_" not in text
         assert redact_stripe_secret(f"failed {secret} whsec_abc", secret) == "failed [redacted] [redacted]"

@@ -104,6 +104,23 @@ def build_apply_payload(listing_id: str, body: dict) -> dict:
     return payload
 
 
+def _apply_still_allowed(db, user: User, job_id: str) -> bool:
+    """Stop a queued application once the free sends are used up. Premium is unlimited."""
+    from blixtbo.billing import allow_application
+    from blixtbo.config import settings
+
+    used = db.query(Job).filter(Job.user_id == user.id, Job.kind == "apply", Job.status != "failed", Job.id != job_id).count()
+    entitlement = None
+    if settings.data_backend == "firestore" and getattr(user, "firebase_uid", None):
+        try:
+            from blixtbo.keepalive import read_entitlement
+
+            entitlement = read_entitlement(user.firebase_uid)
+        except Exception:
+            entitlement = None
+    return allow_application(used, entitlement)
+
+
 def run_job(db, job: Job) -> None:
     user = db.get(User, job.user_id)
     if user is None:
@@ -115,6 +132,10 @@ def run_job(db, job: Job) -> None:
         if job.kind == "create_account":
             _create(db, user, job)
         elif job.kind in ("apply", "renew"):
+            if job.kind == "apply" and not _apply_still_allowed(db, user, job.id):
+                job.status = "failed"
+                job.last_error = "premium_required"
+                return
             _use_login(db, user, job)
         elif job.kind == "keepalive":
             from blixtbo.keepalive import execute_job

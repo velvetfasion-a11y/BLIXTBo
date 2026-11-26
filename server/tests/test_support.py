@@ -91,7 +91,9 @@ def test_knowledge_includes_site_copy_price_and_facts():
     from blixtbo.knowledge import build_corpus
 
     text = build_corpus()
-    assert "Premium kostar 99 kr per månad efter 3 dagars provperiod." in text
+    assert "Premium kostar 99 kr per månad." in text
+    assert "provperiod" not in text.lower()
+    assert "gratis svep" not in text.lower()
     assert "Kort om hur Blixtbo fungerar" in text
     assert "Integritetspolicy" in text
     assert "Blixtbo äger inga lägenheter" in text
@@ -190,7 +192,7 @@ def test_admin_is_owner_only_and_can_update_and_reply(monkeypatch):
     client = _client(monkeypatch, db)
     created = client.post(
         "/support/tickets",
-        json={"type": "support", "subject": "Premium", "message": "Jag ser inte provperioden"},
+        json={"type": "support", "subject": "Premium", "message": "Jag undrar över betalningen"},
         headers=_auth("member", "member@example.com"),
     )
     assert created.status_code == 200
@@ -305,7 +307,7 @@ def test_chat_falls_back_without_a_key_and_uses_a_mocked_model(monkeypatch):
             }
         if "äger ni" in last.casefold():
             return {"content": "Ja, vi äger lägenheter i Stockholm.", "tool": None}
-        return {"content": "Premium kostar 99 kr i månaden efter 3 dagars prov.", "tool": None}
+        return {"content": "Premium kostar 99 kr i månaden.", "tool": None}
 
     monkeypatch.setattr("blixtbo.support.complete_chat", fake_complete)
     settings.openai_api_key = "test-key"

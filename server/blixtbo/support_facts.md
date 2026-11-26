@@ -8,7 +8,7 @@ En ansökan skickas bara när användaren själv sveper ja eller bekräftar i ap
 
 Köplatser kan hållas aktiva under Profil, med valet Håll mina köplatser aktiva automatiskt. Då loggar Blixtbo in hos hyresvärden och bekräftar kön. En missad förnyelse kan nollställa kötid. BankID sparas aldrig. Hyresvärdens lösenord sparas krypterat.
 
-Gratisversionen har ett tak för automatiska ansökningar. Premium tar bort taket. Pris och provperiod läses från källkoden när kunskapsbasen byggs. Standard är 99 kr per månad efter 3 dagars prov.
+Premium kostar 99 kr per månad. Det håller köplatser aktiva och förnyar dem, skickar ansökan först och bevakar hyresvärdarnas annonser och köer. Blixtbo äger inga lägenheter.
 
 Uppsägning, paus och ånger görs under Inställningar och sedan Prenumeration, eller genom att skriva till support. Assistenten lovar aldrig en återbetalning. En människa avgör betalningsärenden.
 

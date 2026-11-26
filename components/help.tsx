@@ -3,12 +3,11 @@ import { FaqList } from "@/components/faq-list";
 import { SiteFooter } from "@/components/site-footer";
 import { SupportDesk } from "@/components/support";
 import { Wordmark } from "@/components/mark";
-import { premiumPriceKr, trialDays } from "@/lib/billing";
+import { premiumPriceKr } from "@/lib/billing";
 import { SUPPORT_EMAIL } from "@/lib/company";
 import { guideHref, guides } from "@/lib/guides";
 
 export function Help() {
-  const days = trialDays();
   const price = premiumPriceKr();
 
   return (
@@ -71,7 +70,7 @@ export function Help() {
             <p>
               Samma profil används hos varje hyresvärd: yrke, inkomst, hushåll, brev och dokument. Under Koll ser du ansökningar, ködagar och när en kö behöver förnyas.
             </p>
-            <p>Gratisversionen har ett tak för automatiska ansökningar. Premium tar bort det taket.</p>
+            <p>Premium håller köplatser aktiva, skickar ansökan först och bevakar hyresvärdarna.</p>
           </div>
         </section>
 
@@ -79,7 +78,7 @@ export function Help() {
           <h2 className="font-serif text-2xl tracking-[-0.03em]">Betalning och avslut</h2>
           <div className="mt-4 space-y-4 text-sm leading-relaxed text-soft">
             <p>
-              Premium kostar {price} kr i månaden efter {days} dagars provperiod. Kortet läggs till här i appen. Du lämnar inte Blixtbo för en betalsida.
+              Premium kostar {price} kr i månaden. Kortet läggs till här i appen. Du lämnar inte Blixtbo för en betalsida.
             </p>
             <p>
               Avsluta prenumerationen via Inställningar och sedan Prenumeration. Du behåller Premium tills den betalda perioden tar slut. Därefter blir kontot gratis, och inga fler dragningar görs. Du kan ångra ett planerat avslut innan perioden tar slut, på samma sida.

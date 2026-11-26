@@ -439,6 +439,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         confirmed: Boolean(options?.confirmation),
         confirmation: options?.confirmation || "",
       }).catch((error: Error) => {
+        if (error.message === "Premium krävs för att fortsätta.") {
+          const fresh = latest();
+          if (fresh) {
+            commit({
+              ...fresh,
+              applications: fresh.applications.filter((item) => item.id !== id),
+              billing: { ...fresh.billing, usedAutoApplies: Math.max(0, fresh.billing.usedAutoApplies - 1) },
+            });
+          }
+          window.dispatchEvent(new Event("blixtbo-paywall"));
+          return;
+        }
         setToast(error.message || "Ansökan gick inte att köa.");
       });
     }
