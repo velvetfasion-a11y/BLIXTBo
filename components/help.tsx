@@ -3,6 +3,7 @@ import { FaqList } from "@/components/faq-list";
 import { SiteFooter } from "@/components/site-footer";
 import { Wordmark } from "@/components/mark";
 import { premiumPriceKr, trialDays } from "@/lib/billing";
+import { SUPPORT_EMAIL } from "@/lib/company";
 
 export function Help() {
   const days = trialDays();
@@ -93,11 +94,13 @@ export function Help() {
         <section className="mt-10">
           <h2 className="font-serif text-2xl tracking-[-0.03em]">Kontakt</h2>
           <div className="mt-4 space-y-4 text-sm leading-relaxed text-soft">
-            <p>Det finns ingen supportadress publicerad i Blixtbo ännu. Vi har därför inte lagt in en mejladress här.</p>
-            <div className="rounded-2xl bg-paper-deep px-4 py-3">
-              <p className="font-medium text-ink">Platshållare</p>
-              <p className="mt-1">Ingen supportadress är publicerad. Vi har inte hittat på en mejladress. Den här rutan byts ut när en adress finns.</p>
-            </div>
+            <p>
+              Frågor om betalning, kontot eller dina uppgifter skickar du till{" "}
+              <a className="font-medium text-ink" href={`mailto:${SUPPORT_EMAIL}`}>
+                {SUPPORT_EMAIL}
+              </a>
+              .
+            </p>
           </div>
         </section>
       </div>

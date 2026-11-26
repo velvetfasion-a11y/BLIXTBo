@@ -356,17 +356,35 @@ def test_unlink_failure_keeps_landlord_logins():
     assert db.get(User, user.id).google_sub == "google-uid-unlink"
 
 
-def test_live_stripe_key_is_refused_before_deletion():
+def test_live_stripe_key_anonymises_customer():
     db = _db()
     user = _user(db, uid="uid-live", email="live@example.com")
     _rows(db, user)
-    settings.stripe_secret_key = "sk_live_no"
+    settings.stripe_secret_key = "sk_live_account"
     gateway = Gateway()
     try:
-        _run(db, "erasure", uid="uid-live", email="live@example.com", gateway=gateway)
+        result, gateway = _run(db, "erasure", uid="uid-live", email="live@example.com", gateway=gateway)
+    finally:
+        settings.stripe_secret_key = "sk_test_account"
+    assert result["stripe"] == "anonymised"
+    assert result["firebaseAuth"] == "deleted"
+    assert db.get(User, user.id) is None
+    assert any(call[0] == "Customer.modify" for call in gateway.client.calls)
+    assert "Customer.delete" not in [call[0] for call in gateway.client.calls]
+
+
+def test_malformed_stripe_key_is_refused_before_deletion():
+    db = _db()
+    user = _user(db, uid="uid-badkey", email="badkey@example.com")
+    _rows(db, user)
+    settings.stripe_secret_key = "pk_live_not_a_secret"
+    gateway = Gateway()
+    try:
+        _run(db, "erasure", uid="uid-badkey", email="badkey@example.com", gateway=gateway)
         raise AssertionError("expected failure")
     except AccountError as exc:
         assert exc.status == 503
+        assert "ogiltig" in exc.detail
     finally:
         settings.stripe_secret_key = "sk_test_account"
     assert db.get(User, user.id) is not None

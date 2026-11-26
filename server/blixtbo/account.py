@@ -12,7 +12,7 @@ import re
 
 from sqlalchemy.orm import Session
 
-from blixtbo.billing import is_stripe_test_key
+from blixtbo.billing import is_stripe_secret_key
 from blixtbo.config import settings
 from blixtbo.models import Approval, AuditLog, DeletionJournal, Job, LandlordLogin, Notice, User, utcnow
 
@@ -62,8 +62,8 @@ class StripeGateway:
     def _client(self):
         if not settings.stripe_secret_key:
             return None
-        if not is_stripe_test_key(settings.stripe_secret_key):
-            raise AccountError(503, "Stripe-testnyckel saknas.")
+        if not is_stripe_secret_key(settings.stripe_secret_key):
+            raise AccountError(503, "Stripe-nyckeln är ogiltig.")
         stripe = self.client or _load_stripe()
         stripe.api_key = settings.stripe_secret_key
         return stripe

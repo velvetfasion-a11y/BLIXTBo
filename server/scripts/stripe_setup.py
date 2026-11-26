@@ -1,38 +1,49 @@
-"""Create the Blixtbo Premium price in Stripe test mode.
+"""Create the Blixtbo Premium product, the monthly price, and the billing webhook.
 
-The price is PREMIUM_PRICE_KR per month (default 99 SEK). The 3-day trial is trial_period_days on the subscription, not part of the price and not a coupon. The API also creates this price by lookup key. Does not charge anyone.
+The price is PREMIUM_PRICE_KR per month (default 99 SEK). The 3-day trial is trial_period_days
+on the subscription, not part of the price and not a coupon. The same script works for a test
+key (sk_test_ or rk_test_) and a live key (sk_live_ or rk_live_). A second run reuses the
+product, the price, and the webhook. Prints ids. Never prints the key.
 """
 
 import os
 import sys
 
-import stripe
-
-from blixtbo.billing import is_stripe_test_key, price_lookup_key, price_ore
+from blixtbo.billing import (
+    WEBHOOK_URL,
+    ensure_billing_webhook,
+    ensure_premium_catalog,
+    is_stripe_secret_key,
+    redact_stripe_secret,
+)
 from blixtbo.config import settings
 
 
-def main() -> int:
+def main(stripe_client=None) -> int:
     key = settings.stripe_secret_key or os.environ.get("STRIPE_SECRET_KEY", "")
-    if not is_stripe_test_key(key):
-        print("Sätt STRIPE_SECRET_KEY till en testnyckel (sk_test_ eller rk_test_). Inga live-nycklar.", file=sys.stderr)
+    if not is_stripe_secret_key(key):
+        print(
+            "Sätt STRIPE_SECRET_KEY till en giltig nyckel (sk_test_, rk_test_, sk_live_ eller rk_live_).",
+            file=sys.stderr,
+        )
         return 1
-    stripe.api_key = key
-    key_name = price_lookup_key()
-    existing = stripe.Price.list(lookup_keys=[key_name], active=True, limit=1)
-    if existing.data:
-        print(f"STRIPE_PRICE_ID={existing.data[0].id}")
-        return 0
-    product = stripe.Product.create(name="Blixtbo Premium")
-    price = stripe.Price.create(
-        product=product.id,
-        unit_amount=price_ore(),
-        currency="sek",
-        recurring={"interval": "month"},
-        lookup_key=key_name,
-    )
-    print(f"STRIPE_PRICE_ID={price.id}")
+    client = stripe_client
+    if client is None:
+        import stripe
+
+        stripe.api_key = key
+        client = stripe
+    try:
+        product_id, price_id = ensure_premium_catalog(client)
+        webhook_id = ensure_billing_webhook(client)
+    except Exception as exc:
+        print(f"Stripe-uppsättningen misslyckades: {redact_stripe_secret(str(exc), key)}", file=sys.stderr)
+        return 1
+    print(f"STRIPE_PRODUCT_ID={product_id}")
+    print(f"STRIPE_PRICE_ID={price_id}")
+    print(f"STRIPE_WEBHOOK_ENDPOINT_ID={webhook_id}")
     print(int(settings.premium_price_kr), "kr/mån efter", int(settings.trial_days), "dagars provperiod.")
+    print("Webhook:", WEBHOOK_URL)
     return 0
 
 

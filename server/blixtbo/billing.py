@@ -4,9 +4,25 @@ The app confirms a SetupIntent or PaymentIntent inside its own sheet. The trial 
 Cancelling keeps access until the period ends (cancel_at_period_end). It does not open a Stripe-hosted page.
 """
 
+import re
 from datetime import datetime, timezone
 
 from blixtbo.config import settings
+
+PRODUCT_NAME = "Blixtbo Premium"
+WEBHOOK_URL = "https://blixtbo.se/api/billing/webhook"
+WEBHOOK_EVENTS = (
+    "customer.subscription.created",
+    "customer.subscription.updated",
+    "customer.subscription.deleted",
+    "customer.subscription.trial_will_end",
+    "invoice.paid",
+    "invoice.payment_failed",
+    "setup_intent.succeeded",
+    "payment_intent.succeeded",
+    "checkout.session.completed",
+)
+_SECRET_KEY = re.compile(r"^(?:sk|rk)_(?:test|live)_\S+$")
 
 
 def price_ore() -> int:
@@ -18,9 +34,100 @@ def price_lookup_key() -> str:
     return "blixtbo_premium_monthly"
 
 
-def is_stripe_test_key(key: str) -> bool:
-    """Secret or restricted test keys. Live keys (sk_live_, rk_live_) are refused."""
-    return key.startswith(("sk_test_", "rk_test_"))
+def is_stripe_secret_key(key: str) -> bool:
+    """Secret or restricted keys in test or live mode. Empty, publishable, and malformed keys are refused."""
+    return isinstance(key, str) and bool(_SECRET_KEY.fullmatch(key))
+
+
+def redact_stripe_secret(text: str, key: str = "") -> str:
+    if key:
+        text = text.replace(key, "[redacted]")
+    text = re.sub(r"\b(?:sk|rk|pk)_(?:test|live)_\S+", "[redacted]", text)
+    return re.sub(r"\bwhsec_\S+", "[redacted]", text)
+
+
+def _stripe_id(value) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return str(value.get("id") or "")
+    return str(getattr(value, "id", "") or "")
+
+
+def _stripe_get(value, name: str, default=None):
+    if isinstance(value, dict):
+        return value.get(name, default)
+    return getattr(value, name, default)
+
+
+def _page_data(page) -> list:
+    return list(getattr(page, "data", []) or [])
+
+
+def _find_product(stripe, name: str) -> str:
+    starting_after = None
+    while True:
+        params: dict = {"active": True, "limit": 100}
+        if starting_after:
+            params["starting_after"] = starting_after
+        page = stripe.Product.list(**params)
+        data = _page_data(page)
+        for item in data:
+            if _stripe_get(item, "name") == name:
+                return _stripe_id(item)
+        if not data or not getattr(page, "has_more", False):
+            return ""
+        starting_after = _stripe_id(data[-1])
+
+
+def ensure_premium_catalog(stripe) -> tuple[str, str]:
+    """Product plus the monthly price. A second call returns the same ids."""
+    key = price_lookup_key()
+    existing = stripe.Price.list(lookup_keys=[key], active=True, limit=1)
+    found = _page_data(existing)
+    if found:
+        price = found[0]
+        product = _stripe_get(price, "product", "")
+        product_id = product if isinstance(product, str) else _stripe_id(product)
+        return product_id, _stripe_id(price)
+    product_id = _find_product(stripe, PRODUCT_NAME)
+    if not product_id:
+        created = stripe.Product.create(name=PRODUCT_NAME)
+        product_id = _stripe_id(created)
+    price = stripe.Price.create(
+        product=product_id,
+        unit_amount=price_ore(),
+        currency="sek",
+        recurring={"interval": "month"},
+        lookup_key=key,
+    )
+    return product_id, _stripe_id(price)
+
+
+def ensure_billing_webhook(stripe, url: str = WEBHOOK_URL) -> str:
+    """One endpoint for the billing URL. Missing events are added. The secret is not returned."""
+    starting_after = None
+    while True:
+        params: dict = {"limit": 100}
+        if starting_after:
+            params["starting_after"] = starting_after
+        page = stripe.WebhookEndpoint.list(**params)
+        data = _page_data(page)
+        for item in data:
+            if _stripe_get(item, "url") != url:
+                continue
+            endpoint_id = _stripe_id(item)
+            current = list(_stripe_get(item, "enabled_events", []) or [])
+            if "*" not in current:
+                merged = list(dict.fromkeys([*current, *WEBHOOK_EVENTS]))
+                if set(merged) != set(current):
+                    stripe.WebhookEndpoint.modify(endpoint_id, enabled_events=merged)
+            return endpoint_id
+        if not data or not getattr(page, "has_more", False):
+            break
+        starting_after = _stripe_id(data[-1])
+    created = stripe.WebhookEndpoint.create(url=url, enabled_events=list(WEBHOOK_EVENTS))
+    return _stripe_id(created)
 
 
 def subscription_data(firebase_uid: str) -> dict:

@@ -97,7 +97,7 @@ export function homeFaqs(): FaqItem[] {
   ];
 }
 
-export const PUBLIC_PATHS = ["/", "/hjalp"] as const;
+export const PUBLIC_PATHS = ["/", "/hjalp", "/villkor", "/integritet"] as const;
 
 export const PRIVATE_PATHS = [
   "/api",
